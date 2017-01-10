@@ -441,6 +441,9 @@ function compare_npc_tables(compress_id_start, compress_id_end)
   local moved_id_key = '';
   local sql_line = '';
   local k = 0;
+  if (not (compress_id_start or compress_id_end)) then
+    compress_id_start, compress_id_end = 0, 0
+  end
   for i = 1, (num_sql_npcs - 1) do -- Force traversing in current SQL list order.
     k = ordered_sql_ids[i];
     v = loaded_sql_npcs[k];
@@ -599,14 +602,14 @@ setup_zone(windower.ffxi.get_info().zone)
 windower.register_event('incoming chunk', check_incoming_chunk);
 
 -- Edit/uncomment the next line to simply load a table into memory
--- (If you captured NPCs and just want to hop around and get widescane data)
+-- (If you captured NPCs and just want to hop around and get widescan data)
 --load_npc_packet_table("Abyssea - Attohwa", true);
 
 -- Edit/uncomment the following three lines to compare a table to SQL
---load_sql_into_table("South Gustaberg"); -- (npclogger/data/character/current sql/"zone".sql
---load_npc_packet_table("South Gustaberg"); -- (npclogger/data/character/tables/"zone".sql
+-- load_sql_into_table("Abyssea - Grauberg"); -- (npclogger/data/character/current sql/"zone".sql)
+-- load_npc_packet_table("Abyssea - Grauberg"); -- (npclogger/data/character/tables/"zone".sql)
 --compare_npc_tables(); -- Prints results to: npclogger/data/logs/comparison.log
 
 -- Edit/uncomment the following line to "compress" SQL Insert changes for NPCs between
 -- the two IDs (ie: don't show CHANGED: blah). Good for copy/pasting entire blocks.
---compare_npc_tables(17216135, 17216155);
+-- compare_npc_tables(17818119, 17818197);
