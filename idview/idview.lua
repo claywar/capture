@@ -118,7 +118,7 @@ function get_params(params_string)
   local params = {}
   local final_param_string = '';
   for i=0, 7 do
-    params[i + 1] = string.sub(params_string, (i*4)+1, (i*4) + 4);
+    params[i + 1] = string.sub(params_string, (i*8)+1, (i*8) + 8);
   end
   for _,v in ipairs(params) do
     final_param_string = final_param_string .. v .. ", ";
