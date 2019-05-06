@@ -98,7 +98,6 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   local mob_name;
   log_string = "Incoming: ";
   if (id == 0x03D) then
-	--local inventory = windower.ffxi.get_items(bag, index)
 	local bag = update_packet['Bag'];
 	local index = update_packet['Inventory Index'];
 	local item_id = windower.ffxi.get_items(bag, index)['id'];

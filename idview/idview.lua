@@ -151,9 +151,9 @@ function check_outgoing_chunk(id, data, modified, injected, blocked)
     if (mob_name) then
       log_string = log_string .. ' ('.. mob.name ..')'
     end;
-    log_string = log_string .. string.format(', Event: 0x%04X, ', update_packet['Menu ID']);
+    log_string = log_string .. string.format(', Event: %05X', tonumber(update_packet['Menu ID'], 16));
     raw_header = log_string;
-    log_string = log_string .. 'Option: '.. update_packet['Option Index'];
+    log_string = log_string .. ', Option: '.. update_packet['Option Index'];
   end
   
   if (log_string ~= "Outgoing Packet: ") then
@@ -193,7 +193,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
     if (mob_name) then
       log_string = log_string .. ' ('.. mob.name ..')'
     end;
-    log_string = log_string .. string.format(', Event: 0x%04X', update_packet['Menu ID']);
+    log_string = log_string .. string.format(', Event: %05X', tonumber(update_packet['Menu ID'], 16));
     raw_header = log_string;
     local params = get_params(string.sub(data:hex(), (0x08*2)+1, (0x28*2)));
     log_string = log_string .. string.format(', Params: %s', params);
