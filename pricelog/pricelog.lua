@@ -16,6 +16,13 @@ files = require('files')
 file = T{}
 file.simple = files.new('data/'.. my_name ..'/logs/simple.log', true)
 file.raw = files.new('data/'.. my_name ..'/logs/raw.log', true)
+file.database = files.new('data/'.. my_name ..'/database.lua', true)
+
+local resale_database = require('data/'.. my_name ..'/database')
+prices = resale_database or {}
+new_items = false
+checked_unseen = false
+write_scheduled = false
 
 -- Prettily formats a packet. Shamelessly stolen from Arcon's Packet Viewer.
 --------------------------------------------------
@@ -83,9 +90,89 @@ end)()
 -- Sets up tables and files for use in the current zone
 --------------------------------------------------
 function setup_zone(zone)
-  local current_zone = res.zones[zone].en;
-  file.simple = files.new('data/'.. my_name ..'/simple/'.. current_zone ..'.log', true)
-  file.raw = files.new('data/'.. my_name ..'/raw/'.. current_zone ..'.log', true)
+	local current_zone = res.zones[zone].en;
+	file.simple = files.new('data/'.. my_name ..'/simple/'.. current_zone ..'.log', true)
+	file.raw = files.new('data/'.. my_name ..'/raw/'.. current_zone ..'.log', true)
+	write_full_table()
+end
+
+-- Checks to see if the current zone table had new prices
+-- and if so, rewrites the entire price database
+--------------------------------------------------
+function write_full_table()
+	if new_items then
+		-- Lua can't natively sort by key, so we need to get a sorted table of keys first.
+		-- We also get to go through the prices table twice because of this.
+		-- This is on top of the O for sorting.
+		local sorted_item_ids = {}
+		for id, _ in pairs(prices) do
+			table.insert(sorted_item_ids, id)
+		end
+		table.sort(sorted_item_ids) -- We now have a sorted table of keys...
+
+		file.database:write("local resale_database =\n{\n") -- Start up the table.
+		for _, id in ipairs(sorted_item_ids) do
+			-- Now we can use ipairs to guarantee the pairs are gone through in order.
+			local item = prices[id]
+			file.database:append(format_table_entry(id, item['name'], item['price']))
+		end
+		file.database:append("}\nreturn resale_database")
+		new_items = false
+		write_scheduled = false
+		checked_unseen = false
+		windower.add_to_chat(7, "[PriceLog] New items saved to database!")
+	end
+end
+
+-- Checks to see if a price should be added to the database
+-- and does so if the item has not been seen before
+--------------------------------------------------
+function add_to_database(id, name, price)
+	if not prices[id] then
+		prices[id] = {
+			['id'] = id,
+			['name'] = name,
+			['price'] = price
+		}
+		windower.add_to_chat(7, "[PriceLog] Added: ".. id .. " (".. name ..") - ".. price .."g")
+		new_items = true
+		if not write_scheduled then
+			coroutine.schedule(function() write_full_table() end, 60)
+			write_scheduled = true
+		end
+	end
+end
+
+-- Returns a string representing an entry for the lua database
+--------------------------------------------------
+function format_table_entry(item_id, item_name, price)
+	return string.format(
+		"    [%d] = {id=%d, name=\"%s\", price=%d},\n",
+		item_id,
+		item_id,
+		string.gsub(item_name, '"', '\"'),
+		price
+	  )
+end
+
+-- Checks the current inventory for any unseen items
+--------------------------------------------------
+function check_for_unseen()
+	local unseen_list = ''
+	local inventory = windower.ffxi.get_items(0)
+	for _, inv_item in ipairs(inventory) do
+		local id = inv_item['id']
+		if id and id > 0 then
+			local item = res.items[id]
+			if (not item.flags['No NPC Sale']) and (not prices[id]) then
+				unseen_list = unseen_list .. item['en'] .. ", "
+			end
+		end
+	end
+	if unseen_list ~= '' then
+		windower.add_to_chat(7, "[PriceLog] Unseen: " .. unseen_list)
+	end
+	checked_unseen = true
 end
 
 -- Checks incoming chunks for price response and log them
@@ -98,6 +185,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   local mob_name;
   log_string = "Incoming: ";
   if (id == 0x03D) then
+	--local inventory = windower.ffxi.get_items(bag, index)
 	local bag = update_packet['Bag'];
 	local index = update_packet['Inventory Index'];
 	local item_id = windower.ffxi.get_items(bag, index)['id'];
@@ -106,10 +194,13 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
     log_string = log_string .. '0x03D (Price Response), ';
 	log_string = log_string .. 'Item: ' .. item_id .. ' (' .. item['en'] ..')';
     log_string = log_string .. ' Price: ' .. update_packet['Price'];
-  end
-  
-  if (log_string ~= "Incoming: ") then
-    windower.add_to_chat(7, "[PriceLog] " .. log_string);
+
+    --windower.add_to_chat(7, "[PriceLog] " .. log_string);
+	if not checked_unseen then
+		check_for_unseen();
+	end
+
+	add_to_database(item_id, item['en'], update_packet['Price']);
     file.simple:append(log_string .. "\n\n");
     file.raw:append(log_string .. '\n'.. data:hexformat_file() .. '\n');
   end
