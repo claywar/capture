@@ -12,7 +12,7 @@ file = T{}
 file.compare = files.new('data/'.. my_name ..'/logs/comparison.log', true)
 
 _addon.name = 'NPC Logger'
-_addon.version = '0.2'
+_addon.version = '0.3'
 _addon.author = 'ibm2431'
 _addon.commands = {'npclogger'}
 
@@ -41,7 +41,12 @@ seen_masks = {
   [0x0F] = {}
 }
 
+widescan_packet = packets.new('outgoing', 0xF4, {['Flags'] = 1})
 
+npc_zone_database = {}
+new_npcs_seen = false
+write_scheduled = false
+current_zone = 0
 
 -- =================================================
 -- ==    Packet Formatting Functions              ==
@@ -321,16 +326,29 @@ function log_npc(npc_id, mask, npc_info, data)
   for k,v in pairs(basic_info) do
     npc_info[k] = v;
   end
+  npc_info['raw_packet'] = data:hex()
   logged_npcs[npc_id] = npc_info
   log_raw(npc_id, mask, data);
   log_packet_to_table(npc_id, npc_info, data);
+  
+  if npc_zone_database[npc_id] and npc_zone_database[npc_id]['level'] then
+    npc_info['level'] = npc_zone_database[npc_id]['level']
+  end
+  -- See if this is a new NPC
+  if (not npc_zone_database[npc_id]) or (not npc_zone_database[npc_id]['id']) then
+    npc_zone_database[npc_id] = npc_info
+    npc_zone_database[npc_id]['raw_packet'] = data:hex()
+    schedule_database_write()
+    windower.add_to_chat(7, "[NPC Logger] New NPC: " .. npc_info['id'] .. " (".. npc_info['name'] ..")");
+  end
 end
 
 -- Reads an NPC SQL file and loads their values into a Lua table
 --------------------------------------------------
 function load_sql_into_table(zone)
   local id, name, polutils_name, r, x, y, z, flag, speed, speedsub, animation, animationsub, namevis, status, flags, look, name_prefix, required_expansion, widescan;
-  local capture_string = "(%d+),(.*),(.*),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,']+),([^,']+),([^,']+),([^,]+),([^,']+),([^,]+),([^,]+)";
+  local npc_capture_string = "(%d+),(.*),(.*),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,']+),([^,']+),([^,']+),([^,]+),([^,']+),([^,]+),([^,]+)";
+  local mob_capture_string = "(%d+),(.*),(.*),(%d+),([^,]+),([^,]+),([^,]+),(%d+)";
   
   local lines = files.readlines("data/".. my_name .."/current_sql/".. zone ..".sql")
   local loaded_npc = {}
@@ -340,31 +358,48 @@ function load_sql_into_table(zone)
     if (v) then
       v = string.gsub(v, ",'", ",");
       v = string.gsub(v, "',", ",");
-      _, _, id, name, polutils_name, r, x, y, z, flag, speed, speedsub, animation, animationsub, namevis, status, flags, look, name_prefix, required_expansion, widescan = string.find(v, capture_string);
       loaded_npc = {}
-      if (id) then
-        loaded_npc['id'] = tonumber(id);
-        loaded_npc['name'] = name;
-        loaded_npc['polutils_name'] = polutils_name;
-        loaded_npc['r'] = tonumber(r);
-        loaded_npc['x'] = tonumber(x);
-        loaded_npc['y'] = tonumber(y);
-        loaded_npc['z'] = tonumber(z);
-        loaded_npc['flag'] = tonumber(flag);
-        loaded_npc['speed'] = speed;
-        loaded_npc['speedsub'] = speedsub;
-        loaded_npc['animation'] = tonumber(animation);
-        loaded_npc['animationsub'] = tonumber(animationsub);
-        loaded_npc['namevis'] = tonumber(namevis);
-        loaded_npc['status'] = tonumber(status);
-        loaded_npc['flags'] = tonumber(flags);
-        loaded_npc['look'] = look;
-        loaded_npc['name_prefix'] = tonumber(name_prefix);
-        loaded_npc['widescan'] = widescan;
-        loaded_npc['order'] = num_loaded_npcs;
-        ordered_sql_ids[num_loaded_npcs] = tonumber(id);
-        loaded_sql_npcs[tonumber(id)] = loaded_npc;
-        num_loaded_npcs = num_loaded_npcs + 1;
+      _, _, id, name, polutils_name, r, x, y, z, flag, speed, speedsub, animation, animationsub, namevis, status, flags, look, name_prefix, required_expansion, widescan = string.find(v, npc_capture_string);
+      if flag then -- Is an NPC
+        if (id) then
+          loaded_npc['id'] = tonumber(id);
+          loaded_npc['name'] = name;
+          loaded_npc['polutils_name'] = polutils_name;
+          loaded_npc['r'] = tonumber(r);
+          loaded_npc['x'] = tonumber(x);
+          loaded_npc['y'] = tonumber(y);
+          loaded_npc['z'] = tonumber(z);
+          loaded_npc['flag'] = tonumber(flag);
+          loaded_npc['speed'] = speed;
+          loaded_npc['speedsub'] = speedsub;
+          loaded_npc['animation'] = tonumber(animation);
+          loaded_npc['animationsub'] = tonumber(animationsub);
+          loaded_npc['namevis'] = tonumber(namevis);
+          loaded_npc['status'] = tonumber(status);
+          loaded_npc['flags'] = tonumber(flags);
+          loaded_npc['look'] = look;
+          loaded_npc['name_prefix'] = tonumber(name_prefix);
+          loaded_npc['widescan'] = widescan;
+          loaded_npc['order'] = num_loaded_npcs;
+          ordered_sql_ids[num_loaded_npcs] = tonumber(id);
+          loaded_sql_npcs[tonumber(id)] = loaded_npc;
+          num_loaded_npcs = num_loaded_npcs + 1;
+        end
+      else -- Was a mob spawn.
+        _, _, id, name, polutils_name, group, x, y, z, r = string.find(v, mob_capture_string);
+        if (id) then
+          loaded_npc['id'] = tonumber(id);
+          loaded_npc['name'] = name;
+          loaded_npc['polutils_name'] = polutils_name;
+          loaded_npc['r'] = tonumber(r);
+          loaded_npc['x'] = tonumber(x);
+          loaded_npc['y'] = tonumber(y);
+          loaded_npc['z'] = tonumber(z);
+          loaded_npc['group'] = tonumber(group);
+          ordered_sql_ids[num_loaded_npcs] = tonumber(id);
+          loaded_sql_npcs[tonumber(id)] = loaded_npc;
+          num_loaded_npcs = num_loaded_npcs + 1;
+        end
       end
     end
   end
@@ -374,23 +409,31 @@ end
 -- Loads a table of NPC packets that NPC Logger logged itself.
 --------------------------------------------------
 function load_npc_packet_table(zone, into_main_table)
-  local packet_table = require("data/".. my_name .."/tables/".. zone);
+  local packet_table = {};
+  if type(zone) == "string" then
+    packet_table = require("data/".. my_name .."/tables/".. zone)
+  else
+    packet_table = zone
+  end
   packet_table = table.sort(packet_table);
   if (into_main_table) then
-  
     for npc_id, npc_info in pairs(packet_table) do
       logged_npcs[npc_id] = npc_info;
       basic_npc_info[npc_id] = {}
       for field_name, field_value in pairs(npc_info) do
         basic_npc_info[npc_id][field_name] = field_value;
       end
-      npc_looks[npc_id] = npc_info['look'];
+      if npc_info['look'] then
+        npc_looks[npc_id] = npc_info['look'];
+      end
       npc_raw_names[npc_id] = npc_info['name'];
       npc_names[npc_id] = npc_info['polutils_name'];
       seen_masks[0x07][npc_id] = true;
       seen_masks[0x0F][npc_id] = true;
       seen_masks[0x57][npc_id] = true;
-      npc_ids_by_index[npc_info['index']] = npc_id;
+      if npc_info['index'] then
+        npc_ids_by_index[npc_info['index']] = npc_id;
+      end
     end
   else
     loaded_table_npcs = packet_table;
@@ -408,15 +451,16 @@ function compare_npcs(sql_npc, npclogger_npc)
   -- flag in the list to another in the list.
   local ignore_flags = S{1, 6, 7, 8, 14, 16, 21, 22, 29}
   for _,v in pairs(keys) do
-    if (v == 'look') then
+    if v == 'look' and npclogger_npc[v] then
       npclogger_npc[v] = "0x".. string.rpad(npclogger_npc[v], "0", 40);
     end
-    if (sql_npc[v] ~= npclogger_npc[v]) then
+
+    if sql_npc[v] and (sql_npc[v] ~= npclogger_npc[v]) then
       changes = changes .. "'".. v .."': ".. sql_npc[v] .." changed to ".. npclogger_npc[v] .. " ";
       changed = true;
     end
   end
-  if (sql_npc['flag'] ~= npclogger_npc['flag']) then
+  if sql_npc['flag'] and (sql_npc['flag'] ~= npclogger_npc['flag']) then
     if (changed) then
       changes = changes .. "'flag': ".. sql_npc['flag'] .." changed to ".. npclogger_npc['flag'] .. " ";
     elseif (not (ignore_flags[sql_npc['flag']] and ignore_flags[sql_npc['flag']])) then
@@ -436,7 +480,7 @@ end
 
 -- Compares two loaded NPC tables (from target SQL, and NPC Logger's table).
 --------------------------------------------------
-function compare_npc_tables(compress_id_start, compress_id_end)
+function compare_npc_tables(compress_id_start, compress_id_end, changes_only)
   local npc_comparison = '';
   local moved_id_key = '';
   local sql_line = '';
@@ -453,8 +497,14 @@ function compare_npc_tables(compress_id_start, compress_id_end)
         if (not ((v['id'] >= compress_id_start) and (v['id'] <= compress_id_end))) then
           file.compare:append("CHANGED: ".. k .."; ".. npc_comparison .."\n");
         end
-        sql_line = make_sql_insert_string(loaded_table_npcs[k]);
-        file.compare:append(sql_line .."\n");
+        if v['flag'] then -- Is NPC
+          sql_line = make_npc_sql_insert_string(loaded_table_npcs[k]);
+        else -- Is Mob
+          sql_line = make_mob_sql_insert_string(loaded_table_npcs[k]);
+        end
+        if not changes_only then
+          file.compare:append(sql_line .."\n");
+        end
       else
         -- print("VERIFIED: ".. k.."; ".. loaded_sql_npcs[k]['name']);
       end
@@ -473,7 +523,11 @@ function compare_npc_tables(compress_id_start, compress_id_end)
   end
   table.sort(new_npcs)
   for _,v in pairs(new_npcs) do
-    sql_line = make_sql_insert_string(loaded_table_npcs[v], true)
+    if loaded_table_npcs[v]['flag'] then -- Is NPC
+      sql_line = make_npc_sql_insert_string(loaded_table_npcs[v], true);
+    else -- Is Mob
+      sql_line = make_mob_sql_insert_string(loaded_table_npcs[v], true);
+    end
     file.compare:append(sql_line .."\n");
     --print("ADDED: ".. k .."; ".. loaded_table_npcs[k]['name']);
   end
@@ -481,7 +535,7 @@ end
 
 -- Takes an NPC table and outputs and appropriate input statement
 --------------------------------------------------
-function make_sql_insert_string(npc, new_npc)
+function make_npc_sql_insert_string(npc, new_npc)
   if (new_npc) then
     npc["look"] = "0x".. string.rpad(npc["look"], "0", 40)
   end
@@ -510,31 +564,175 @@ function make_sql_insert_string(npc, new_npc)
   return sql_line;
 end
 
+-- Takes a mob table and outputs and appropriate input statement
+--------------------------------------------------
+function make_mob_sql_insert_string(npc, new_npc)
+  if new_npc and npc["look"] then
+    npc["look"] = "0x".. string.rpad(npc["look"], "0", 40)
+  end
+  if not npc["group"] then
+    npc["group"] = 0;
+  end
+  local sql_line = string.format(
+    "INSERT INTO `npc_list` VALUES (%d,'%s','%s',%d,%.3f,%.3f,%.3f,%d);",
+    npc["id"],
+    string.gsub(npc["name"], "'", "_"),
+    string.gsub(npc["polutils_name"], "'", "\'"),
+    npc["group"],
+    npc["x"],
+    npc["y"],
+    npc["z"],
+    npc["r"]
+  )
+  return sql_line;
+end
+
 -- Writes a mob's widescan info to a table log
 --------------------------------------------------
 function write_widescan_info(npc_id)
   local log_string = "    [".. tostring(npc_id) .."] = {";
+  local level = widescan_info[npc_id]['level']
   log_string = log_string .. string.format(
     "['id']=%d, ['name']=\"%s\", ['index']=%d, ['level']=%d",
     widescan_info[npc_id]['id'],
     widescan_info[npc_id]['name'],
     widescan_info[npc_id]['index'],
-    widescan_info[npc_id]['level']
+    level
   )
   log_string = log_string .. "},\n"
+  if not npc_zone_database[npc_id] then
+    npc_zone_database[npc_id] = {}
+  end
+  if (not npc_zone_database[npc_id]['level']) or (npc_zone_database[npc_id]['level'] ~= level) then
+    npc_zone_database[npc_id]['level'] = level
+    if npc_zone_database[npc_id]['id'] then
+      schedule_database_write()
+    end
+  end
   file.widescan:append(log_string);
 end
 
+-- Returns a string representing an NPC, with its level,
+-- to be written to the database/zone.lua file.
+--------------------------------------------------
+function format_database_entry(npc)
+  local database_entry = '';
+  
+  database_entry = database_entry .. "    [".. tostring(npc['id']) .."] = {";
+  database_entry = database_entry .. string.format(
+    "['id']=%d, ['name']=\"%s\", ['polutils_name']=\"%s\", ['npc_type']=\"%s\", ['index']=%d, ['x']=%.3f, ['y']=%.3f, ['z']=%.3f, ['r']=%d, ['flag']=%d, ['speed']=%d, ['speedsub']=%d, ['animation']=%d, ['animationsub']=%d, ['namevis']=%d, ['status']=%d, ['flags']=%d, ['name_prefix']=%d, ['look']=\"%s\", ['raw_packet']=\"%s\",",
+    npc['id'],
+    npc['name'],
+    npc['polutils_name'],
+    npc['npc_type'],
+    npc['index'],
+    npc['x'],
+    npc['y'],
+    npc['z'],
+    npc['r'],
+    npc['flag'],
+    npc['speed'],
+    npc['speedsub'],
+    npc['animation'],
+    npc['animationsub'],
+    npc['namevis'],
+    npc['status'],
+    npc['flags'],
+    npc['name_prefix'],
+    npc['look'],
+    npc['raw_packet']
+  )
+  if npc['level'] and npc['level'] ~= '?' then
+    database_entry = database_entry.." ['level']=".. npc['level']
+  else
+    database_entry = database_entry .." ['level']='?'"
+  end
+  database_entry = database_entry .. "},\n"
+  return database_entry
+end
+
+-- Schedules a write to the zone database
+--------------------------------------------------
+function schedule_database_write()
+  if not new_npcs_seen then
+    new_npcs_seen = true
+  end
+  if not write_scheduled then
+    write_scheduled = true
+    coroutine.schedule(function() write_zone_database(current_zone) end, 60)
+  end
+end
+
+-- Checks to see if the current zone table had new npcs
+-- and if so, rewrites the entire zone's database
+--------------------------------------------------
+function write_zone_database(zone_left)
+  local zone_left_name = res.zones[zone_left].en
+  local table_to_write = ''
+  file.old_zone = files.new('data/'.. my_name ..'/database/'.. zone_left_name ..'.lua', true)
+  	if new_npcs_seen then
+		-- Lua can't natively sort by key, so we need to get a sorted table of keys first.
+		-- We also get to go through the prices table twice because of this.
+		-- This is on top of the O for sorting.
+		local sorted_npc_ids = {}
+		for id, _ in pairs(npc_zone_database) do
+			table.insert(sorted_npc_ids, id)
+		end
+		table.sort(sorted_npc_ids) -- We now have a sorted table of keys...
+
+		table_to_write = "local zone_database =\n{\n" -- Start up the table.
+		for _, id in ipairs(sorted_npc_ids) do
+			-- Now we can use ipairs to guarantee the pairs are gone through in order.
+			local npc = npc_zone_database[id]
+      if npc['id'] then -- Make sure this wasn't an almost empty entry from Widescan.
+        table_to_write = table_to_write .. format_database_entry(npc)
+      end
+		end
+    table_to_write = table_to_write .. "}\nreturn zone_database"
+		file.old_zone:write(table_to_write)
+		new_npcs_seen = false
+		write_scheduled = false
+		windower.add_to_chat(7, "[NPC Logger] New NPC information saved to database!")
+	end
+end
+
+
+
 -- Sets up tables and files for use in the current zone
 --------------------------------------------------
-function setup_zone(zone)
-  local current_zone = res.zones[zone].en;
-  file.packet_table = files.new('data/'.. my_name ..'/tables/'.. current_zone ..'.lua', true)
-  file.full = files.new('data/'.. my_name ..'/logs/'.. current_zone ..'.log', true)
-  file.widescan = files.new('data/'.. my_name ..'/widescan/'.. current_zone ..'.log', true)
-  widescan_by_index = {}
-  widescan_info = {}
-  npc_ids_by_index = {}
+function setup_zone(zone, zone_left)
+  current_zone = zone
+  local zone_name = res.zones[zone].en;
+  file.packet_table = files.new('data/'.. my_name ..'/tables/'.. zone_name ..'.lua', true)
+  file.full = files.new('data/'.. my_name ..'/logs/'.. zone_name ..'.log', true)
+  file.widescan = files.new('data/'.. my_name ..'/widescan/'.. zone_name ..'.log', true)
+  
+  if zone_left and new_npcs_seen then
+    write_zone_database(zone_left)
+  end
+  
+  file.database = files.new('data/'.. my_name ..'/database/'.. zone_name ..'.lua', true)
+  if file.database:exists('data/'.. my_name ..'/database/'.. zone_name ..'.lua') then
+    npc_zone_database = require('data/'.. my_name ..'/database/'.. zone_name)
+  else
+    npc_zone_database = {}
+  end
+  widescan_by_index, widescan_info, npc_ids_by_index = {}, {}, {}
+  new_npcs_seen = false
+  write_scheduled = false
+  
+  if auto_widescanning then
+    auto_widescanning = false
+    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
+  end
+end
+
+function do_widescan()
+  if auto_widescanning then
+    packets.inject(widescan_packet)
+    windower.add_to_chat(7, "[NPC Logger] Widescanned!")
+    coroutine.schedule(function() do_widescan() end, 20)
+  end
 end
 
 function check_incoming_chunk(id, data, modified, injected, blocked)
@@ -550,8 +748,6 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
         npc_raw_names[packet['NPC']] = packet['Name'];
       end
       if ((mask == 0x57) or (mask == 0x0F) or (mask == 0x07)) then
-        windower.add_to_chat(7, "[NPC Logger] Logged NPC ID: " .. packet['NPC']);
-        
         if (mask == 0x57) then
           -- Equipped model.
           npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x44*2));
@@ -559,7 +755,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
           -- Basic/standard NPC model.
           npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x34*2));
         end
-        npc_looks = npc_info['look'];
+        npc_looks[npc_id] = npc_info['look'];
         
         npc_info['flag'] = byte_string_to_int(string.sub(data:hex(), (0x18*2)+1, (0x1C*2)));
         npc_info['speed'] = tonumber(string.sub(data:hex(), (0x1C*2)+1, (0x1D*2)), 16);
@@ -594,21 +790,33 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   end
 end
 
+function check_outgoing_chunk(id, data, modified, injected, blocked)
+  if id == 0xF4 then -- Outgoing widescan request
+    if not auto_widescanning then
+      auto_widescanning = true
+      coroutine.schedule(function() do_widescan() end, 20)
+      windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
+    end
+  end
+end
+
 windower.register_event('zone change', function(new, old)
-  setup_zone(new);
+  setup_zone(new, old);
 end)
 
 setup_zone(windower.ffxi.get_info().zone)
 windower.register_event('incoming chunk', check_incoming_chunk);
+windower.register_event('outgoing chunk', check_outgoing_chunk);
 
 -- Edit/uncomment the next line to simply load a table into memory
 -- (If you captured NPCs and just want to hop around and get widescan data)
---load_npc_packet_table("Abyssea - Attohwa", true);
+-- load_npc_packet_table("Fei'Yin", true);
 
 -- Edit/uncomment the following three lines to compare a table to SQL
--- load_sql_into_table("Abyssea - Grauberg"); -- (npclogger/data/character/current sql/"zone".sql)
--- load_npc_packet_table("Abyssea - Grauberg"); -- (npclogger/data/character/tables/"zone".sql)
---compare_npc_tables(); -- Prints results to: npclogger/data/logs/comparison.log
+--load_sql_into_table("Fei'Yin"); -- (npclogger/data/character/current sql/"zone".sql)
+--load_npc_packet_table("Fei'Yin"); -- (npclogger/data/character/tables/"zone".sql)
+--compare_npc_tables(0, 0); -- Prints results to: npclogger/data/logs/comparison.log
+--compare_npc_tables(0, 0, true); -- Only prints changes without insert statements
 
 -- Edit/uncomment the following line to "compress" SQL Insert changes for NPCs between
 -- the two IDs (ie: don't show CHANGED: blah). Good for copy/pasting entire blocks.
