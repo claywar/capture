@@ -47,6 +47,7 @@ npc_zone_database = {}
 new_npcs_seen = false
 write_scheduled = false
 current_zone = 0
+always_widescan = false
 
 -- =================================================
 -- ==    Packet Formatting Functions              ==
@@ -721,7 +722,7 @@ function setup_zone(zone, zone_left)
   new_npcs_seen = false
   write_scheduled = false
   
-  if auto_widescanning then
+  if auto_widescanning and not always_widescan then
     auto_widescanning = false
     windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
   end
@@ -802,6 +803,30 @@ end
 
 windower.register_event('zone change', function(new, old)
   setup_zone(new, old);
+end)
+
+windower.register_event('addon command',function (command, ...)
+	command = command and command:lower()
+	local args = T{...}
+	if command == 'widescan' then
+    auto_widescanning = true
+    do_widescan()
+  elseif command == 'always_widescan' then
+    if args[1] then
+      if string.lower(args[1]) == 'on' then
+        auto_widescanning = true
+        always_widescan = true
+        do_widescan()
+        windower.add_to_chat(7, "[NPC Logger] WARNING: This persists across zones, and widescan packets will be sent even when normally impossible!")
+      elseif string.lower(args[1]) == 'off' then
+        always_widescan = false
+      else
+        windower.add_to_chat(7, "[NPC Logger] Usage: //npclogger always_widescan on|off")
+      end
+    else
+      windower.add_to_chat(7, "[NPC Logger] Usage: //npclogger always_widescan on|off")
+    end
+	end
 end)
 
 setup_zone(windower.ffxi.get_info().zone)
