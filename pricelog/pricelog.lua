@@ -16,9 +16,15 @@ files = require('files')
 file = T{}
 file.simple = files.new('data/'.. my_name ..'/logs/simple.log', true)
 file.raw = files.new('data/'.. my_name ..'/logs/raw.log', true)
-file.database = files.new('data/'.. my_name ..'/database.lua', true)
 
-local resale_database = require('data/'.. my_name ..'/database')
+local resale_database = {}
+if files.exists('data/'.. my_name ..'/database.lua') then
+  resale_database = require('data/'.. my_name ..'/database')
+  file.database = files.new('data/'.. my_name ..'/database.lua', true)
+else
+  file.database = files.new('data/'.. my_name ..'/database.lua')
+end
+
 prices = resale_database or {}
 new_items = false
 checked_unseen = false
@@ -110,13 +116,14 @@ function write_full_table()
 		end
 		table.sort(sorted_item_ids) -- We now have a sorted table of keys...
 
-		file.database:write("local resale_database =\n{\n") -- Start up the table.
+		local table_to_write = "local resale_database =\n{\n" -- Start up the table.
 		for _, id in ipairs(sorted_item_ids) do
 			-- Now we can use ipairs to guarantee the pairs are gone through in order.
 			local item = prices[id]
-			file.database:append(format_table_entry(id, item['name'], item['price']))
+			table_to_write = table_to_write .. format_table_entry(id, item['name'], item['price'])
 		end
-		file.database:append("}\nreturn resale_database")
+		table_to_write = table_to_write .. "}\nreturn resale_database"
+		file.database:write(table_to_write)
 		new_items = false
 		write_scheduled = false
 		checked_unseen = false
