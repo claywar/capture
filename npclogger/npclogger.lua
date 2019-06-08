@@ -743,7 +743,7 @@ function do_widescan(manual)
     windower.add_to_chat(7, "[NPC Logger] Widescanned!")
   end
   
-  if auto_widescanning then
+  if not manual and auto_widescanning then
     coroutine.schedule(function() do_widescan() end, 20)
   end
 end
@@ -813,9 +813,13 @@ windower.register_event('addon command',function (command, ...)
 	if command == 'widescan' or command == 'ws' then
     do_widescan(true)
   elseif command == 'autowide' or command == 'auto_widescan' or command == 'aws' then
-    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
-    auto_widescanning = true
-    do_widescan()
+    if not auto_widescanning then
+      windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
+      auto_widescanning = true
+      do_widescan()
+    else
+      windower.add_to_chat(7, "[NPC Logger] Auto Widescan is already ON")
+    end
   elseif command == 'stopwide' or command == 'stop_widescan' or command == 'sws' then
     windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
     auto_widescanning = false
