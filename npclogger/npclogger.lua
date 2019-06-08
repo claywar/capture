@@ -12,9 +12,9 @@ file = T{}
 file.compare = files.new('data/'.. my_name ..'/logs/comparison.log', true)
 
 _addon.name = 'NPC Logger'
-_addon.version = '0.3'
+_addon.version = '0.3.1'
 _addon.author = 'ibm2431'
-_addon.commands = {'npclogger'}
+_addon.commands = {'npclogger', 'npcl'}
 
 logged_npcs = {}
 seen_names = S{}
@@ -726,12 +726,24 @@ function setup_zone(zone, zone_left)
     auto_widescanning = false
     windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
   end
+  
+  if not always_widescan then
+    coroutine.schedule(
+      function()
+        if not auto_widescanning then 
+          windower.add_to_chat(7, "[NPC Logger] Auto Widescan is OFF")
+        end
+      end, 15)
+  end
 end
 
-function do_widescan()
-  if auto_widescanning then
+function do_widescan(manual)
+  if manual or auto_widescanning then
     packets.inject(widescan_packet)
     windower.add_to_chat(7, "[NPC Logger] Widescanned!")
+  end
+  
+  if auto_widescanning then
     coroutine.schedule(function() do_widescan() end, 20)
   end
 end
@@ -791,16 +803,6 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   end
 end
 
-function check_outgoing_chunk(id, data, modified, injected, blocked)
-  if id == 0xF4 then -- Outgoing widescan request
-    if not auto_widescanning then
-      auto_widescanning = true
-      coroutine.schedule(function() do_widescan() end, 20)
-      windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
-    end
-  end
-end
-
 windower.register_event('zone change', function(new, old)
   setup_zone(new, old);
 end)
@@ -808,9 +810,15 @@ end)
 windower.register_event('addon command',function (command, ...)
 	command = command and command:lower()
 	local args = T{...}
-	if command == 'widescan' then
+	if command == 'widescan' or command == 'ws' then
+    do_widescan(true)
+  elseif command == 'autowide' or command == 'auto_widescan' or command == 'aws' then
+    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
     auto_widescanning = true
     do_widescan()
+  elseif command == 'stopwide' or command == 'stop_widescan' or command == 'sws' then
+    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
+    auto_widescanning = false
   elseif command == 'always_widescan' then
     if args[1] then
       if string.lower(args[1]) == 'on' then
@@ -831,7 +839,6 @@ end)
 
 setup_zone(windower.ffxi.get_info().zone)
 windower.register_event('incoming chunk', check_incoming_chunk);
-windower.register_event('outgoing chunk', check_outgoing_chunk);
 
 -- Edit/uncomment the next line to simply load a table into memory
 -- (If you captured NPCs and just want to hop around and get widescan data)
