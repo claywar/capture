@@ -1,3 +1,19 @@
+-- ------------------------------------------------------------------------------
+-- USER SETINGS
+-- ------------------------------------------------------------------------------
+settings = {
+  -- verbosity, when NPCL displays it captured NPC information to the chatlog
+  -- 0: Never, 1: When NPC not in database, 2: When NPC first seen during session
+  verbosity = 2,
+  -- message_color, the chatlog color code that messages are displayed in
+  message_color = 7,
+  -- remind_widescan, displays a message a short time after a zone to remind to WS
+  remind_widescan = true,
+}
+
+
+---------------------------------------------------------------------------------
+
 require 'luau'
 require 'strings'
 res = require('resources')
@@ -335,12 +351,21 @@ function log_npc(npc_id, mask, npc_info, data)
   if npc_zone_database[npc_id] and npc_zone_database[npc_id]['level'] then
     npc_info['level'] = npc_zone_database[npc_id]['level']
   end
-  -- See if this is a new NPC
-  if (not npc_zone_database[npc_id]) or (not npc_zone_database[npc_id]['id']) then
-    npc_zone_database[npc_id] = npc_info
-    npc_zone_database[npc_id]['raw_packet'] = data:hex()
-    schedule_database_write()
-    windower.add_to_chat(7, "[NPC Logger] New NPC: " .. npc_info['id'] .. " (".. npc_info['name'] ..")");
+  if settings.verbosity > 0 then
+    local new_npc = false
+    -- See if this is a new NPC
+    if (not npc_zone_database[npc_id]) or (not npc_zone_database[npc_id]['id']) then
+      npc_zone_database[npc_id] = npc_info
+      npc_zone_database[npc_id]['raw_packet'] = data:hex()
+      schedule_database_write()
+      new_npc = true
+    end
+    
+    if new_npc then
+      display("New: " .. npc_info['id'] .. " (".. npc_info['name'] ..")")
+    elseif settings.verbosity == 2 then
+      display("Log: " .. npc_info['id'] .. " (".. npc_info['name'] ..")")
+    end
   end
 end
 
@@ -693,7 +718,7 @@ function write_zone_database(zone_left)
 		file.old_zone:write(table_to_write)
 		new_npcs_seen = false
 		write_scheduled = false
-		windower.add_to_chat(7, "[NPC Logger] New NPC information saved to database!")
+		display("New NPC information saved to database!")
 	end
 end
 
@@ -724,28 +749,38 @@ function setup_zone(zone, zone_left)
   
   if auto_widescanning and not always_widescan then
     auto_widescanning = false
-    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
+    display("Auto Widescan: OFF")
   end
   
-  if not always_widescan then
+  if not always_widescan and settings.remind_widescan then
     coroutine.schedule(
       function()
         if not auto_widescanning then 
-          windower.add_to_chat(7, "[NPC Logger] Auto Widescan is OFF")
+          display("Auto Widescan is OFF")
         end
       end, 15)
   end
 end
 
+-- Sends an outgoing widescan packet, manual is passed in as
+-- true depending on if the user used //npcl ws
+--------------------------------------------------
 function do_widescan(manual)
   if manual or auto_widescanning then
     packets.inject(widescan_packet)
-    windower.add_to_chat(7, "[NPC Logger] Widescanned!")
+    display("Widescanned!")
   end
   
   if not manual and auto_widescanning then
     coroutine.schedule(function() do_widescan() end, 20)
   end
+end
+
+
+-- Prints a message to the chatlog
+--------------------------------------------------
+function display(message)
+  windower.add_to_chat(settings.message_color, "[NPCL] ".. message)
 end
 
 function check_incoming_chunk(id, data, modified, injected, blocked)
@@ -814,14 +849,14 @@ windower.register_event('addon command',function (command, ...)
     do_widescan(true)
   elseif command == 'autowide' or command == 'auto_widescan' or command == 'aws' then
     if not auto_widescanning then
-      windower.add_to_chat(7, "[NPC Logger] Auto Widescan: ON")
+      display("Auto Widescan: ON")
       auto_widescanning = true
       do_widescan()
     else
-      windower.add_to_chat(7, "[NPC Logger] Auto Widescan is already ON")
+      display("Auto Widescan is already ON")
     end
   elseif command == 'stopwide' or command == 'stop_widescan' or command == 'sws' then
-    windower.add_to_chat(7, "[NPC Logger] Auto Widescan: OFF")
+    display("Auto Widescan: OFF")
     auto_widescanning = false
   elseif command == 'always_widescan' then
     if args[1] then
@@ -829,14 +864,14 @@ windower.register_event('addon command',function (command, ...)
         auto_widescanning = true
         always_widescan = true
         do_widescan()
-        windower.add_to_chat(7, "[NPC Logger] WARNING: This persists across zones, and widescan packets will be sent even when normally impossible!")
+        display("WARNING: This persists across zones, and widescan packets will be sent even when normally impossible!")
       elseif string.lower(args[1]) == 'off' then
         always_widescan = false
       else
-        windower.add_to_chat(7, "[NPC Logger] Usage: //npclogger always_widescan on|off")
+        display("Usage: //npclogger always_widescan on|off")
       end
     else
-      windower.add_to_chat(7, "[NPC Logger] Usage: //npclogger always_widescan on|off")
+      display("Usage: //npclogger always_widescan on|off")
     end
 	end
 end)
