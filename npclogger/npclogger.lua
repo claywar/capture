@@ -695,7 +695,7 @@ end
 function write_zone_database(zone_left)
   local zone_left_name = res.zones[zone_left].en
   local table_to_write = ''
-  file.old_zone = files.new('data/'.. my_name ..'/database/'.. zone_left_name ..'.lua', true)
+  file.old_zone = files.new('data/database/'.. zone_left_name ..'.lua', true)
   	if new_npcs_seen then
 		-- Lua can't natively sort by key, so we need to get a sorted table of keys first.
 		-- We also get to go through the prices table twice because of this.
@@ -737,9 +737,9 @@ function setup_zone(zone, zone_left)
     write_zone_database(zone_left)
   end
   
-  file.database = files.new('data/'.. my_name ..'/database/'.. zone_name ..'.lua', true)
-  if file.database:exists('data/'.. my_name ..'/database/'.. zone_name ..'.lua') then
-    npc_zone_database = require('data/'.. my_name ..'/database/'.. zone_name)
+  file.database = files.new('data/database/'.. zone_name ..'.lua', true)
+  if file.database:exists('data/database/'.. zone_name ..'.lua') then
+    npc_zone_database = require('data/database/'.. zone_name)
   else
     npc_zone_database = {}
   end
