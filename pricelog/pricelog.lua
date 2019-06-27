@@ -6,7 +6,7 @@ pack = require('pack')
 bit = require 'bit'
 
 _addon.name = 'PriceLog'
-_addon.version = '0.1'
+_addon.version = '0.1.1'
 _addon.author = 'ibm2431'
 _addon.commands = {'pricelog'}
 
@@ -186,16 +186,14 @@ end
 --------------------------------------------------
 function check_incoming_chunk(id, data, modified, injected, blocked)
   local update_packet = packets.parse('incoming', data)
-  local log_string = "";
-  local raw_header = "";
-  local mob;
-  local mob_name;
-  log_string = "Incoming: ";
+  local raw_header = ""
+  local mob
+  local mob_name
+  local log_string = "Incoming: "
   if (id == 0x03D) then
-    local bag = update_packet['Bag']
-    if bag == 0 then
+    if update_packet['Type'] == 0 then -- Make sure this is a price response and not sale finalization
       local index = update_packet['Inventory Index']
-      local item_id = windower.ffxi.get_items(bag, index)['id']
+      local item_id = windower.ffxi.get_items(0, index)['id']
       local item = res.items[item_id]
 
       log_string = log_string .. '0x03D (Price Response), '
@@ -203,7 +201,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
       log_string = log_string .. ' Price: ' .. update_packet['Price']
 
       if not checked_unseen then
-        check_for_unseen();
+        check_for_unseen()
       end
 
       add_to_database(item_id, item['en'], update_packet['Price'])
@@ -214,8 +212,8 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
 end
 
 windower.register_event('zone change', function(new, old)
-  setup_zone(new);
+  setup_zone(new)
 end)
 
-windower.register_event('incoming chunk', check_incoming_chunk);
+windower.register_event('incoming chunk', check_incoming_chunk)
 setup_zone(windower.ffxi.get_info().zone)
