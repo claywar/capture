@@ -634,7 +634,7 @@ function write_widescan_info(npc_id)
   log_string = log_string .. string.format(
     "['id']=%d, ['name']=\"%s\", ['index']=%d, ['level']=%d",
     widescan_info[npc_id]['id'],
-    widescan_info['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
+    widescan_info[npc_id]['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
     widescan_info[npc_id]['index'],
     level
   )
