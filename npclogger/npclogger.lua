@@ -4,7 +4,7 @@
 settings = {
   -- verbosity, when NPCL displays it captured NPC information to the chatlog
   -- 0: Never, 1: When NPC not in database, 2: When NPC first seen during session
-  verbosity = 2,
+  verbosity = 1,
   -- message_color, the chatlog color code that messages are displayed in
   message_color = 7,
   -- remind_widescan, displays a message a short time after a zone to remind to WS
@@ -28,7 +28,7 @@ file = T{}
 file.compare = files.new('data/'.. my_name ..'/logs/comparison.log', true)
 
 _addon.name = 'NPC Logger'
-_addon.version = '0.3.1'
+_addon.version = '0.3.2'
 _addon.author = 'ibm2431'
 _addon.commands = {'npclogger', 'npcl'}
 
@@ -179,13 +179,33 @@ function get_npc_name(npc_id)
   
   if (mob) then
     if (mob.name ~= '') then
-      npc_names[npc_id] = string.gsub(mob.name, "'", "\'");
+      npc_names[npc_id] = mob.name;
       npc_ids_by_index[mob.index] = npc_id;
     else
       npc_names[npc_id] = false;
     end
   else
     npc_names[npc_id] = 'NO_MOB';
+  end
+end
+
+-- Checks an NPC's "raw name" (from packet) and ensures
+-- we don't write "unwritable" ASCII characters to our files
+--------------------------------------------------
+function handle_npc_raw_name(name)
+  name_bytes = {name:byte(1, #name)}
+  local byte_string = '_MALFORMED_ASCII:';
+  local malformed_ascii = false;
+  for _, byte_value in ipairs(name_bytes) do
+    byte_string = byte_string .. byte_value .. '_';
+    if (byte_value <= 31) or (byte_value >= 127) then
+      malformed_ascii = true;
+    end
+  end
+  if malformed_ascii then
+    return byte_string;
+  else
+    return name;
   end
 end
 
@@ -204,11 +224,8 @@ function get_basic_npc_info(data)
     -- This is a named mob using a hard-set model.
     -- Example: A friendly goblin in town, or a door.
     npc_type = "Simple NPC";
-    name = npc_raw_names[npc_id];
-    name = string.gsub(name, "'", "_");
     polutils_name = npc_names[npc_id];
-    polutils_name = string.gsub(polutils_name, "'", "\\'");
-    polutils_name = string.gsub(polutils_name, "\"", "\\\"");
+    name = npc_raw_names[npc_id];
   end
   
   if (npc_names[npc_id]) then
@@ -220,10 +237,7 @@ function get_basic_npc_info(data)
       -- Example: Arpevion, T.K.
       npc_type = "Equipped NPC";
       polutils_name = npc_names[npc_id];
-      polutils_name = string.gsub(polutils_name, "'", "\\'");
-      polutils_name = string.gsub(polutils_name, "\"", "\\\"");
-      name = string.gsub(polutils_name, " ", "_");
-      name = string.gsub(name, "'", "_");
+      name = polutils_name;
     end
   elseif (not npc_raw_names[npc_id]) then
     -- We can't trust Windower's Model field, so we'll determine
@@ -312,8 +326,8 @@ function log_packet_to_table(npc_id, npc_info, data)
   log_string = log_string .. string.format(
     "['id']=%d, ['name']=\"%s\", ['polutils_name']=\"%s\", ['npc_type']=\"%s\", ['index']=%d, ['x']=%.3f, ['y']=%.3f, ['z']=%.3f, ['r']=%d, ['flag']=%d, ['speed']=%d, ['speedsub']=%d, ['animation']=%d, ['animationsub']=%d, ['namevis']=%d, ['status']=%d, ['flags']=%d, ['name_prefix']=%d, ['look']=\"%s\", ",
     npc_info['id'],
-    npc_info['name'],
-    npc_info['polutils_name'],
+    npc_info['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
+    npc_info['polutils_name']:gsub("(['\"\\])", "\\%1"),
     npc_info['npc_type'],
     npc_info['index'],
     npc_info['x'],
@@ -568,8 +582,8 @@ function make_npc_sql_insert_string(npc, new_npc)
   local sql_line = string.format(
     "INSERT INTO `npc_list` VALUES (%d,'%s','%s',%d,%.3f,%.3f,%.3f,%d,%d,%d,%d,%d,%d,%d,%d,%s,%d,%s,%d);",
     npc["id"],
-    string.gsub(npc["name"], "'", "_"),
-    string.gsub(npc["polutils_name"], "'", "\'"),
+    npc['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
+    npc['polutils_name']:gsub("(['\"\\])", "\\%1"),
     npc["r"],
     npc["x"],
     npc["y"],
@@ -602,8 +616,7 @@ function make_mob_sql_insert_string(npc, new_npc)
   local sql_line = string.format(
     "INSERT INTO `npc_list` VALUES (%d,'%s','%s',%d,%.3f,%.3f,%.3f,%d);",
     npc["id"],
-    string.gsub(npc["name"], "'", "_"),
-    string.gsub(npc["polutils_name"], "'", "\'"),
+    npc["name"]:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
     npc["group"],
     npc["x"],
     npc["y"],
@@ -621,7 +634,7 @@ function write_widescan_info(npc_id)
   log_string = log_string .. string.format(
     "['id']=%d, ['name']=\"%s\", ['index']=%d, ['level']=%d",
     widescan_info[npc_id]['id'],
-    widescan_info[npc_id]['name'],
+    widescan_info['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
     widescan_info[npc_id]['index'],
     level
   )
@@ -648,8 +661,8 @@ function format_database_entry(npc)
   database_entry = database_entry .. string.format(
     "['id']=%d, ['name']=\"%s\", ['polutils_name']=\"%s\", ['npc_type']=\"%s\", ['index']=%d, ['x']=%.3f, ['y']=%.3f, ['z']=%.3f, ['r']=%d, ['flag']=%d, ['speed']=%d, ['speedsub']=%d, ['animation']=%d, ['animationsub']=%d, ['namevis']=%d, ['status']=%d, ['flags']=%d, ['name_prefix']=%d, ['look']=\"%s\", ['raw_packet']=\"%s\",",
     npc['id'],
-    npc['name'],
-    npc['polutils_name'],
+    npc['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
+    npc['polutils_name']:gsub("(['\"\\])", "\\%1"),
     npc['npc_type'],
     npc['index'],
     npc['x'],
@@ -698,7 +711,7 @@ function write_zone_database(zone_left)
   file.old_zone = files.new('data/database/'.. zone_left_name ..'.lua', true)
   	if new_npcs_seen then
 		-- Lua can't natively sort by key, so we need to get a sorted table of keys first.
-		-- We also get to go through the prices table twice because of this.
+		-- We also get to go through the NPC table twice because of this.
 		-- This is on top of the O for sorting.
 		local sorted_npc_ids = {}
 		for id, _ in pairs(npc_zone_database) do
@@ -793,7 +806,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
       local npc_info = {}
       if ((packet['Name'] ~= '') and (not npc_raw_names[packet['NPC']]) and (not (mask == 0x57))) then
         -- Valid raw name we haven't seen yet is set.
-        npc_raw_names[packet['NPC']] = packet['Name'];
+        npc_raw_names[packet['NPC']] = handle_npc_raw_name(packet['Name']);
       end
       if ((mask == 0x57) or (mask == 0x0F) or (mask == 0x07)) then
         if (mask == 0x57) then
