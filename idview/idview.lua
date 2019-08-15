@@ -17,9 +17,11 @@ file = T{}
 file.simple = files.new('data/'.. my_name ..'/logs/simple.log', true)
 file.raw = files.new('data/'.. my_name ..'/logs/raw.log', true)
 
--- Prettily formats a packet. Shamelessly stolen from Arcon's Packet Viewer.
---------------------------------------------------
-string.hexformat_file = (function()
+-- ==================================================
+-- ==    Packet Formatting Functions               ==
+-- == Shamelessly stolen from Arcon's PacketViewer ==
+-- ==================================================
+do
     -- Precompute hex string tables for lookups, instead of constant computation.
     local top_row = '        |  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F      | 0123456789ABCDEF\n    ' .. '-':rep((16+1)*3 + 2) .. '  ' .. '-':rep(16 + 6) .. '\n'
 
@@ -32,6 +34,7 @@ string.hexformat_file = (function()
         end
     end
     chars[0x5C] = '\\\\'
+    chars[0x25] = '%%'
 
     local line_replace = {}
     for i = 0x01, 0x10 do
@@ -43,7 +46,7 @@ string.hexformat_file = (function()
     end
 
     -- Receives a byte string and returns a table-formatted string with 16 columns.
-    return function(str, byte_colors)
+    string.hexformat_file = function(str, byte_colors)
         local length = #str
         local str_table = {}
         local from = 1
@@ -78,7 +81,7 @@ string.hexformat_file = (function()
         end
         return '%s%s':format(top_row, table.concat(str_table))
     end
-end)()
+end
 
 -- Converts a string in base base to a number.
 --------------------------------------------------
