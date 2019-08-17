@@ -1,3 +1,25 @@
+-- ------------------------------------------------------------------------------
+-- USER SETINGS
+-- ------------------------------------------------------------------------------
+settings = {
+  -- colors: Windower color codes for each of the given kinds of text
+  colors = {
+      system = 7, -- [ID View], NPC:, Event:, Params:
+      incoming = 7, -- INCOMING
+      outgoing = 7, -- OUTGOING
+      event_header = 207, -- CS Event (0x032), CS Event + Params (0x034)
+      event_option = 53, -- Event Option (0x05B)
+      event_update = 207, -- Event Update (0x05C)
+      npc_chat = 160, -- NPC Chat (0x036)
+      actor = 8, -- 01234567 (Name)
+      event = 1, -- 123
+      option = 14, -- 1
+      message = 1, -- 12345
+      params = 14, -- 0, 1, 2, 3, 4, 5, 6, 7
+  }
+}
+---------------------------------------------------------------------------------
+
 require 'luau'
 require 'strings'
 res = require('resources')
@@ -6,7 +28,7 @@ pack = require('pack')
 bit = require 'bit'
 
 _addon.name = 'IDView'
-_addon.version = '0.1'
+_addon.version = '0.2'
 _addon.author = 'ibm2431'
 _addon.commands = {'idview'}
 
@@ -16,6 +38,35 @@ files = require('files')
 file = T{}
 file.simple = files.new('data/'.. my_name ..'/logs/simple.log', true)
 file.raw = files.new('data/'.. my_name ..'/logs/raw.log', true)
+
+---------------------------------------------------------------------------------
+
+
+colors = { -- Preformatted character codes for log colors. Should not need to be modified.
+  system = string.char(0x1F, settings.colors.system),
+  incoming = string.char(0x1F, settings.colors.incoming),
+  outgoing = string.char(0x1F, settings.colors.outgoing),
+  event_header = string.char(0x1F, settings.colors.event_header),
+  event_option = string.char(0x1F, settings.colors.event_option),
+  event_update = string.char(0x1F, settings.colors.event_update),
+  npc_chat = string.char(0x1F, settings.colors.npc_chat),
+  actor = string.char(0x1F, settings.colors.actor),
+  event = string.char(0x1F, settings.colors.event),
+  option = string.char(0x1F, settings.colors.option),
+  message = string.char(0x1F, settings.colors.message),
+  params = string.char(0x1F, settings.colors.params),
+}
+
+h = { -- Headers for log string. ex: NPC:
+  idview = colors.system .. '[ID View] ',
+  actor = colors.system .. 'NPC: '.. colors.actor,
+  event = colors.system .. 'Event: '.. colors.event,
+  option = colors.system .. 'Option: '.. colors.option,
+  message = colors.system .. 'Message: '.. colors.message,
+  params = colors.system .. 'Params: '.. colors.params,
+}
+
+---------------------------------------------------------------------------------
 
 -- ==================================================
 -- ==    Packet Formatting Functions               ==
@@ -120,13 +171,20 @@ end
 function get_params(params_string)
   local params = {}
   local final_param_string = '';
-  for i=0, 7 do
+  local colorized_params = '';
+  local int_rep = 0;
+  for i=0, 6 do
     params[i + 1] = string.sub(params_string, (i*8)+1, (i*8) + 8);
+    int_rep = byte_string_to_int(params[i + 1])
+    final_param_string = final_param_string .. int_rep .. ", ";
+    colorized_params = colorized_params .. colors.params .. int_rep .. ", ";
   end
-  for _,v in ipairs(params) do
-    final_param_string = final_param_string .. byte_string_to_int(v) .. ", ";
-  end
-  return final_param_string;
+  params[8] = string.sub(params_string, (7*8)+1, (7*8) + 8);
+  int_rep = byte_string_to_int(params[8])
+  final_param_string = final_param_string .. int_rep;
+  colorized_params = colorized_params .. colors.params .. int_rep;
+    
+  return final_param_string, colorized_params;
 end
 
 -- Sets up tables and files for use in the current zone
@@ -144,25 +202,34 @@ function check_outgoing_chunk(id, data, modified, injected, blocked)
   local log_string = "";
   local mob;
   local mob_name;
-  log_string = "Outgoing Packet: ";
+
+  local type, actor, colored_actor, event, option = nil;
+  local simple_string = ''; -- For files
+  local log_string = ''; -- For chatlog
+
   if (id == 0x05B) then
     -- Dialog Choice
+    type = 'Event Option (0x05B): ';
+    type_color = colors.event_option;
+    actor = update_packet['Target'];
     mob = windower.ffxi.get_mob_by_id(update_packet['Target']);
     if (mob) then mob_name = mob.name end;
-    log_string = log_string .. '0x05B (Event Option), ';
-    log_string = log_string .. 'NPC: ' .. update_packet['Target'];
-    if (mob_name) then
-      log_string = log_string .. ' ('.. mob.name ..')'
-    end;
-    log_string = log_string .. string.format(', Event: %05X', tonumber(update_packet['Menu ID'], 16));
-    raw_header = log_string;
-    log_string = log_string .. ', Option: '.. update_packet['Option Index'];
+    if (mob_name) then 
+      colored_actor = actor .. ' '.. colors.actor .. '('.. mob.name ..')';
+      actor = actor .. ' ('.. mob.name ..')' ;
+    end
+    event = string.format('%05X', tonumber(update_packet['Menu ID'], 16));
+    option = update_packet['Option Index'];
+
+    simple_string = "OUTGOING > " .. type .. 'NPC: ' .. actor .. ', Event: '.. event .. ', Option: '.. option;
+    log_string = h.idview.. colors.outgoing ..'%s'.. type_color..'%s'..  h.actor..'%s, '.. h.event..'%s, '.. h.option..'%s';
+    log_string = string.format(log_string, "OUTGOING > ", type, colored_actor, event, option);
   end
   
-  if (log_string ~= "Outgoing Packet: ") then
-    windower.add_to_chat(7, "[ID View] " .. log_string);
-    file.simple:append(log_string .. "\n\n");
-    file.raw:append(raw_header .. '\n'.. data:hexformat_file() .. '\n');
+  if (log_string ~= '') then
+    windower.add_to_chat(7, log_string);
+    file.simple:append(simple_string .. "\n\n");
+    file.raw:append(simple_string .. '\n'.. data:hexformat_file() .. '\n');
   end
 end
 
@@ -170,42 +237,73 @@ end
 --------------------------------------------------
 function check_incoming_chunk(id, data, modified, injected, blocked)
   local update_packet = packets.parse('incoming', data)
-  local log_string = "";
-  local raw_header = "";
   local mob;
   local mob_name;
-  log_string = "Incoming Packet: ";
+  
+  local type, actor, colored_actor, event, params, colored_params = nil;
+  local simple_string = ''; -- For files
+  local log_string = ''; -- For chatlog
+  
   if (id == 0x036) then
     -- NPC Chat
-    log_string = log_string .. '0x036 (NPC Chat), ';
-    log_string = log_string .. 'Actor: ' .. update_packet['Actor'];
+      
+    type = 'NPC Chat (0x036): ';
+    type_color = colors.npc_chat;
+    actor = update_packet['Actor'];
     mob = windower.ffxi.get_mob_by_id(update_packet['Actor']);
     if (mob) then mob_name = mob.name end;
-    if (mob_name) then log_string = log_string .. ' ('.. mob.name ..')' end;
-    log_string = log_string .. ', Message: '.. update_packet['Message ID'];
-  elseif ((id == 0x032) or (id == 0x034)) then
+    if (mob_name) then
+      colored_actor = actor .. ' '.. colors.actor .. '('.. mob.name ..')';
+      actor = actor .. ' ('.. mob.name ..')';
+    end
+    local message = update_packet['Message ID'];
+
+    simple_string = "INCOMING < " .. type .. 'NPC: ' .. actor .. ', Message: '.. message;
+    log_string = h.idview.. colors.incoming ..'%s'.. type_color..'%s'..  h.actor..'%s, '.. h.message..'%s';
+    log_string = string.format(log_string, "INCOMING < ", type, colored_actor, message);
+  elseif ((id == 0x032) or (id == 0x034) or (id == 0x05C)) then
+    local type_color = ''
     -- Event CS
     if (id == 0x032) then
-      log_string = log_string .. '0x032 (CS Event), ';
-    else
-      log_string = log_string .. '0x034 (CS Event + Params), ';
+      type = 'CS Event (0x032): ';
+      type_color = colors.event_header;
+    elseif (id == 0x034) then
+      type = 'CS Event + Params (0x034): ';
+      type_color = colors.event_header;
+    elseif (id == 0x05C) then
+      type = 'Event Update (0x05C): ';
+      type_color = colors.event_update;
     end
-    log_string = log_string .. 'NPC: ' .. update_packet['NPC'];
-    mob = windower.ffxi.get_mob_by_id(update_packet['NPC']);
-    if (mob) then mob_name = mob.name end;
-    if (mob_name) then
-      log_string = log_string .. ' ('.. mob.name ..')'
-    end;
-    log_string = log_string .. string.format(', Event: %05X', tonumber(update_packet['Menu ID'], 16));
-    raw_header = log_string;
-    local params = get_params(string.sub(data:hex(), (0x08*2)+1, (0x28*2)));
-    log_string = log_string .. string.format(', Params: %s', params);
+    
+    if (id ~= 0x05C) then
+      actor = update_packet['NPC'];
+      mob = windower.ffxi.get_mob_by_id(update_packet['NPC']);
+      if (mob) then mob_name = mob.name end;
+      if (mob_name) then
+        colored_actor = actor .. ' '.. colors.actor .. '('.. mob.name ..')';
+        actor = actor .. ' ('.. mob.name ..')';
+      end
+      event = string.format('%05X', tonumber(update_packet['Menu ID'], 16));
+    end
+    
+    local params = nil
+    if (id == 0x05C) then
+      params, colored_params = get_params(string.sub(data:hex(), (0x04*2)+1, (0x24*2)));
+      simple_string = "INCOMING < " .. type .. 'Params: '.. params;
+      log_string = h.idview.. colors.incoming..'%s'.. type_color..'%s'.. h.params..'%s';
+      log_string = string.format(log_string, "INCOMING < ", type, colored_params);
+    else
+      params, colored_params = get_params(string.sub(data:hex(), (0x04*2)+1, (0x24*2)));
+      simple_string = "INCOMING < " .. type .. 'NPC: ' .. actor .. ', Event: '.. event.. ', Params: '.. params;
+      log_string = h.idview.. colors.incoming ..'%s'.. type_color..'%s'..  h.actor..'%s, '.. h.event..'%s, '.. h.params..'%s';
+      log_string = string.format(log_string, "INCOMING < ", type, colored_actor, event, colored_params);
+    end
   end
   
-  if (log_string ~= "Incoming Packet: ") then
-    windower.add_to_chat(7, "[ID View] " .. log_string);
-    file.simple:append(log_string .. "\n\n");
-    file.raw:append(raw_header .. '\n'.. data:hexformat_file() .. '\n');
+  if (log_string ~= '') then
+    windower.add_to_chat(7, log_string);
+    file.simple:append(simple_string .. "\n\n");
+    file.raw:append(simple_string .. '\n'.. data:hexformat_file() .. '\n');
   end
 end
 
