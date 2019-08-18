@@ -1,18 +1,3 @@
--- ------------------------------------------------------------------------------
--- USER SETINGS
--- ------------------------------------------------------------------------------
-settings = {
-  -- verbosity, when NPCL displays it captured NPC information to the chatlog
-  -- 0: Never, 1: When NPC not in database, 2: When NPC first seen during session
-  verbosity = 1,
-  -- message_color, the chatlog color code that messages are displayed in
-  message_color = 7,
-  -- remind_widescan, displays a message a short time after a zone to remind to WS
-  remind_widescan = true,
-}
-
-
----------------------------------------------------------------------------------
 
 require 'luau'
 require 'strings'
@@ -20,6 +5,43 @@ res = require('resources')
 packets = require('packets')
 pack = require('pack')
 bit = require 'bit'
+texts  = require('texts')
+
+
+-- ------------------------------------------------------------------------------
+-- USER SETINGS
+-- ------------------------------------------------------------------------------
+
+defaults = T{}
+
+-- verbosity, when NPCL displays it captured NPC information to the chatlog
+-- 0: Never, 1: When NPC not in database, 2: When NPC first seen during session
+defaults.verbosity = 1
+-- message_color, the chatlog color code that messages are displayed in
+defaults.message_color = 7
+-- remind_widescan, displays a message a short time after a zone to remind to WS
+defaults.remind_widescan = true
+-- auto_ws_mode, 1: When seeing mob we lack WS for, 2: Auto-timed (30s)
+defaults.auto_ws_mode = 1
+-- show_bar, shows the NPCL info bar
+defaults.show_bar = true
+
+defaults.debug_box = T{}
+defaults.debug_box.pos   = T{}
+defaults.debug_box.pos.x = windower.get_windower_settings().x_res*1/3
+defaults.debug_box.pos.y = windower.get_windower_settings().y_res-17
+defaults.debug_box.text       = {}
+defaults.debug_box.text.size  = 10
+defaults.debug_box.text.font  = 'Courier New'
+defaults.debug_box.text.alpha = 255
+defaults.debug_box.text.red   = 255
+defaults.debug_box.text.green = 255
+defaults.debug_box.text.blue  = 255
+
+settings = config.load(defaults)
+
+---------------------------------------------------------------------------------
+
 
 my_name = windower.ffxi.get_player().name
 
@@ -28,7 +50,7 @@ file = T{}
 file.compare = files.new('data/'.. my_name ..'/logs/comparison.log', true)
 
 _addon.name = 'NPC Logger'
-_addon.version = '0.3.2'
+_addon.version = '0.4.0'
 _addon.author = 'ibm2431'
 _addon.commands = {'npclogger', 'npcl'}
 
@@ -38,9 +60,18 @@ npc_info = {}
 npc_names = {}
 npc_raw_names = {}
 npc_looks = {}
+
+widescan_packet = packets.new('outgoing', 0xF4, {['Flags'] = 1})
+widescan = {
+  num_new = 0,
+  new = {},
+  seen = {},
+  checked = {}
+}
 widescan_by_index = {}
 widescan_info = {}
 npc_ids_by_index = {}
+
 
 loaded_sql_npcs = {}
 loaded_table_npcs = {}
@@ -57,13 +88,43 @@ seen_masks = {
   [0x0F] = {}
 }
 
-widescan_packet = packets.new('outgoing', 0xF4, {['Flags'] = 1})
+
 
 npc_zone_database = {}
 new_npcs_seen = false
 write_scheduled = false
 current_zone = 0
 always_widescan = false
+scan_scheduled = false
+scheduled_write_coroutine = false -- Coroutine.
+
+-- Debug Box
+show_bar = settings.show_bar
+
+debug = {
+  box = texts.new(),
+  ws_time = 0,
+  ws_auto = 0,
+  save_time = 0,
+  settings = settings.debug_box
+}
+
+if (settings.auto_ws_mode == 2) then
+  box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d}s AutoWS: ${ws_auto|%2d} WSCool: ${ws_time|%2d}'
+else
+  box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d} WS: ${ws_time|%2d}'
+end
+debug.box = texts.new(box_text, debug.settings)
+debug.box.save_time = '0 '
+debug.box.ws_time = '0 '
+debug.box.ws_auto = '0 '
+debug.box.npc_id = 0
+debug.box.npc_level = '?'
+
+if show_bar then
+  debug.box:show()
+end
+
 
 -- ==================================================
 -- ==    Packet Formatting Functions               ==
@@ -166,6 +227,43 @@ function byte_string_to_int(x)
   x = bit.bswap(x)
   return x
 end
+
+-- Pads a string to the right
+--------------------------------------------------
+function pad_right (str, length, char)
+  local padded = str .. string.rep(char or ' ', length - #str)
+  return padded
+end
+
+fields = {
+  ['always_string'] = {
+    ['name'] = true,
+    ['polutils_name'] = true,
+    ['npc_type'] = true,
+    ['look'] = true,
+  },
+  ['padding'] = {
+    ['name'] = 35,
+    ['polutils_name'] = 55,
+    ['npc_type'] = 28,
+    ['index'] = 14,
+    ['level'] = 14,
+    ['x'] = 15,
+    ['y'] = 15,
+    ['z'] = 15,
+    ['r'] = 10,
+    ['flag'] = 16,
+    ['speed'] = 13,
+    ['speedsub'] = 16,
+    ['animation'] = 17,
+    ['animationsub'] = 20,
+    ['namevis'] = 16,
+    ['status'] = 14,
+    ['flags'] = 18,
+    ['name_prefix'] = 20,
+    ['look'] = 52,
+  }
+}
 
 -- =======================
 -- == Logging Functions ==
@@ -363,15 +461,23 @@ function log_npc(npc_id, mask, npc_info, data)
   log_raw(npc_id, mask, data);
   log_packet_to_table(npc_id, npc_info, data);
   
-  if npc_zone_database[npc_id] and npc_zone_database[npc_id]['level'] then
-    npc_info['level'] = npc_zone_database[npc_id]['level']
+  local index = npc_info['index'];
+   
+  if widescan_by_index[index] then
+    widescan.seen[npc_id] = widescan_by_index[index]['level'];
+  elseif npc_zone_database[npc_id] and (not scannable(npc_id)) then
+    widescan.seen[npc_id] = "'X'";
   end
+  
+  if widescan.seen[npc_id] then
+    npc_info['level'] = widescan.seen[npc_id];
+  end
+
   if settings.verbosity > 0 then
     local new_npc = false
     -- See if this is a new NPC
     if (not npc_zone_database[npc_id]) or (not npc_zone_database[npc_id]['id']) then
       npc_zone_database[npc_id] = npc_info
-      npc_zone_database[npc_id]['raw_packet'] = data:hex()
       schedule_database_write()
       new_npc = true
     end
@@ -631,25 +737,43 @@ end
 --------------------------------------------------
 function write_widescan_info(npc_id)
   local log_string = "    [".. tostring(npc_id) .."] = {";
-  local level = widescan_info[npc_id]['level']
-  log_string = log_string .. string.format(
-    "['id']=%d, ['name']=\"%s\", ['index']=%d, ['level']=%d",
-    widescan_info[npc_id]['id'],
-    widescan_info[npc_id]['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
-    widescan_info[npc_id]['index'],
-    level
-  )
-  log_string = log_string .. "},\n"
-  if not npc_zone_database[npc_id] then
-    npc_zone_database[npc_id] = {}
-  end
-  if (not npc_zone_database[npc_id]['level']) or (npc_zone_database[npc_id]['level'] ~= level) then
-    npc_zone_database[npc_id]['level'] = level
-    if npc_zone_database[npc_id]['id'] then
-      schedule_database_write()
+  local level = widescan_info[npc_id]['level'];
+  if level then
+    log_string = log_string .. string.format(
+      "['id']=%d, ['name']=\"%s\", ['index']=%d, ['level']=%d",
+      widescan_info[npc_id]['id'],
+      widescan_info[npc_id]['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
+      widescan_info[npc_id]['index'],
+      level
+    )
+    log_string = log_string .. "},\n"
+    
+    if not npc_zone_database[npc_id] then
+      npc_zone_database[npc_id] = {};
     end
+    if (not npc_zone_database[npc_id]['level']) or (npc_zone_database[npc_id]['level'] ~= level) then
+      npc_zone_database[npc_id]['level'] = level;
+      if not widescan.new[npc_id] then
+        widescan.new[npc_id] = true;
+        widescan.num_new = widescan.num_new + 1;
+        schedule_database_write();
+      end
+    end
+    file.widescan:append(log_string);
   end
-  file.widescan:append(log_string);
+end
+
+-- Handles padding a field for a database entry
+-- Padding amount taken from fields.padding[field],
+-- String wrapping from fields.always_string[field]
+--------------------------------------------------
+function pad_field(field, value)
+  local padding = fields.padding[field]
+  if fields.always_string[field] then
+    return pad_right("['".. field .."']=\"".. value .. "\",", padding)
+  else
+    return pad_right("['".. field .."']=".. value .. ",", padding)
+  end
 end
 
 -- Returns a string representing an NPC, with its level,
@@ -660,33 +784,49 @@ function format_database_entry(npc)
   
   database_entry = database_entry .. "    [".. tostring(npc['id']) .."] = {";
   database_entry = database_entry .. string.format(
-    "['id']=%d, ['name']=\"%s\", ['polutils_name']=\"%s\", ['npc_type']=\"%s\", ['index']=%d, ['x']=%.3f, ['y']=%.3f, ['z']=%.3f, ['r']=%d, ['flag']=%d, ['speed']=%d, ['speedsub']=%d, ['animation']=%d, ['animationsub']=%d, ['namevis']=%d, ['status']=%d, ['flags']=%d, ['name_prefix']=%d, ['look']=\"%s\", ['raw_packet']=\"%s\",",
+    "['id']=%d, %s %s %s %s ",
     npc['id'],
-    npc['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_"),
-    npc['polutils_name']:gsub("(['\"\\])", "\\%1"),
-    npc['npc_type'],
-    npc['index'],
-    npc['x'],
-    npc['y'],
-    npc['z'],
-    npc['r'],
-    npc['flag'],
-    npc['speed'],
-    npc['speedsub'],
-    npc['animation'],
-    npc['animationsub'],
-    npc['namevis'],
-    npc['status'],
-    npc['flags'],
-    npc['name_prefix'],
-    npc['look'],
-    npc['raw_packet']
-  )
-  if npc['level'] and npc['level'] ~= '?' then
-    database_entry = database_entry.." ['level']=".. npc['level']
+    pad_field('name', npc['name']:gsub("(['\"\\])", "\\%1"):gsub("%s", "_")),
+    pad_field('polutils_name', npc['polutils_name']:gsub("(['\"\\])", "\\%1")),
+    pad_field('npc_type', npc['npc_type']),
+    pad_field('index', npc['index'])
+  );
+  
+  
+  if not npc['level'] then
+    if not scannable(npc['id']) then
+      database_entry = database_entry .. pad_field('level', "'X'")
+    else
+      database_entry = database_entry .. pad_field('level', "'?'")
+    end
+  elseif npc['level'] ~= '?' then
+    if npc['level'] == 'X' then
+      database_entry = database_entry .. pad_field('level', "'X'")
+    else
+      database_entry = database_entry .. pad_field('level', npc['level'])
+    end
   else
-    database_entry = database_entry .." ['level']='?'"
+    database_entry = database_entry .. pad_field('level', "'?'")
   end
+  
+  database_entry = database_entry .. string.format(
+    " %s %s %s %s %s %s %s %s %s %s %s %s %s %s ['raw_packet']=\"%s\",",
+    pad_field('x', string.format("%.3f", npc['x'])),
+    pad_field('y', string.format("%.3f",npc['y'])),
+    pad_field('z', string.format("%.3f",npc['z'])),
+    pad_field('r', npc['r']),
+    pad_field('flag', npc['flag']),
+    pad_field('speed', npc['speed']),
+    pad_field('speedsub', npc['speedsub']),
+    pad_field('animation', npc['animation']),
+    pad_field('animationsub', npc['animationsub']),
+    pad_field('namevis', npc['namevis']),
+    pad_field('status', npc['status']),
+    pad_field('flags', npc['flags']),
+    pad_field('name_prefix', npc['name_prefix']),
+    pad_field('look', npc['look']),
+    npc['raw_packet']
+  );
   database_entry = database_entry .. "},\n"
   return database_entry
 end
@@ -699,8 +839,20 @@ function schedule_database_write()
   end
   if not write_scheduled then
     write_scheduled = true
-    coroutine.schedule(function() write_zone_database(current_zone) end, 60)
+    debug.save_time = os.clock() + 60
+    scheduled_write_coroutine = coroutine.schedule(function() write_zone_database(current_zone) end, 60)
   end
+end
+
+-- Checks to see if new information we have on a NPC is worth writing
+--------------------------------------------------
+function should_update(memory_npc_info, file_npc_info)
+  if not file_npc_info then
+    return true
+  elseif widescan.seen[file_npc_info['id']] and (file_npc_info['level'] ~= memory_npc_info['level']) then
+    return true
+  end
+  return false
 end
 
 -- Checks to see if the current zone table had new npcs
@@ -708,35 +860,105 @@ end
 --------------------------------------------------
 function write_zone_database(zone_left)
   local zone_left_name = res.zones[zone_left].en
-  local table_to_write = ''
-  file.old_zone = files.new('data/database/'.. zone_left_name ..'.lua', true)
-  	if new_npcs_seen then
-		-- Lua can't natively sort by key, so we need to get a sorted table of keys first.
-		-- We also get to go through the NPC table twice because of this.
-		-- This is on top of the O for sorting.
-		local sorted_npc_ids = {}
-		for id, _ in pairs(npc_zone_database) do
-			table.insert(sorted_npc_ids, id)
-		end
-		table.sort(sorted_npc_ids) -- We now have a sorted table of keys...
+  local string_to_write = ''
+  local old_zone_path = 'data/database/'.. zone_left_name
+  file.old_zone = files.new(old_zone_path ..'.lua', true)
+  if new_npcs_seen then
+    local table_to_write = {}
+    local sorted_npc_ids = {}
+    
+    -- First make sure any NPCs currently in the file aren't lost between instances
+    -- of NPCL by inserting new NPCs we have into a write table based off 
+    -- of what the database is /right now/ (ie: from other instance)
+    local updated_npcs = 0
+    local file_zone_database = load_database(zone_left)
 
-		table_to_write = "local zone_database =\n{\n" -- Start up the table.
-		for _, id in ipairs(sorted_npc_ids) do
-			-- Now we can use ipairs to guarantee the pairs are gone through in order.
-			local npc = npc_zone_database[id]
-      if npc['id'] then -- Make sure this wasn't an almost empty entry from Widescan.
-        table_to_write = table_to_write .. format_database_entry(npc)
+    for id, npc in pairs(npc_zone_database) do
+      local file_npc = file_zone_database[id]
+      local new_information = should_update(npc, file_npc)
+      if (not file_npc) or new_information then -- Our db in memory has NPC info the file doesn't
+        table_to_write[id] = npc -- Add it to our table to write
+        table.insert(sorted_npc_ids, id) -- Pop its ID into a table we'll sort in a bit
+        updated_npcs = updated_npcs + 1 -- Keep track of how many new NPCs (vs file) we're adding
       end
-		end
-    table_to_write = table_to_write .. "}\nreturn zone_database"
-		file.old_zone:write(table_to_write)
-		new_npcs_seen = false
-		write_scheduled = false
-		display("New NPC information saved to database!")
+      if new_information then
+        -- If we're updating, be sure to remove from current zone DB so don't write same NPC twice
+        file_zone_database[id] = nil
+			end
+    end
+    
+    -- We only need to step through further tables if we're actually going to add an NPC.
+    -- If not, a different instance of NPCL has already written a more expanded version
+    -- of a database for the zone, so we'll simply copy that into OUR instance's memory
+    if updated_npcs > 0 then
+      -- Go through what is currently in the database and add it to the table
+      -- we're planning on writing
+      for id, npc in pairs(file_zone_database) do
+          -- Add the ID to the table we'll sort. There shouldn't be duplicated IDs.
+          table.insert(sorted_npc_ids, id)
+          table_to_write[id] = npc
+      end
+      
+      -- Lua can't natively sort by key, so we need to build a sorted table of IDs first.
+      -- We'll simply sort the table we built while traversing our memory and file tables.
+      table.sort(sorted_npc_ids) -- We now have a sorted table of keys...
+
+      string_to_write = "local zone_database =\n{\n" -- Start up the table string.
+      for _, id in ipairs(sorted_npc_ids) do
+        -- Now we can use ipairs to guarantee the pairs are gone through in order.
+        local npc = table_to_write[id]
+        if npc['id'] then -- Make sure this wasn't an almost empty entry from Widescan.
+          string_to_write = string_to_write .. format_database_entry(npc)
+        end
+      end
+      string_to_write = string_to_write .. "}\nreturn zone_database"
+      file.old_zone:write(string_to_write)
+      display("New NPC information saved to database! (".. updated_npcs .." NPCs)")
+    else
+      npc_zone_database = file_zone_database -- Just swap our DB-in-memory to our DB-from-file
+      display("No new NPC information to write!")
+    end
+    
+    new_npcs_seen = false
+    write_scheduled = false
 	end
+  debug.save_time = 0
+  debug.box.save_time = debug.save_time
 end
 
-
+-- Returns a copy of a NPCL database file, to be loaded as our memory
+-------------------------------------------------- 
+function load_database(zone)
+  local memory = {}
+  local database = {}
+  local checked_widescan = {}
+  local npc_indexes = {}
+  local seen_widescan = {}
+  
+  local zone_name = res.zones[zone].en
+  local path = 'data/database/'.. zone_name
+  
+  file.database = files.new(path ..'.lua', true)
+  if file.database:exists(path ..'.lua') then
+    package.loaded[path] = nil
+    database = require(path)
+    for id, npc in pairs(database) do
+      memory[id] = {}
+      for key, value in pairs(npc) do
+        memory[id][key] = value
+      end
+      
+      if npc['level'] and (npc['level'] ~= '?') then
+        checked_widescan[id] = true
+        seen_widescan[id] = npc['level']
+      end
+      if npc['index'] then
+        npc_indexes[npc['index']] = id
+      end
+    end
+  end
+  return memory, checked_widescan, npc_indexes, seen_widescan
+end
 
 -- Sets up tables and files for use in the current zone
 --------------------------------------------------
@@ -751,15 +973,13 @@ function setup_zone(zone, zone_left)
     write_zone_database(zone_left)
   end
   
-  file.database = files.new('data/database/'.. zone_name ..'.lua', true)
-  if file.database:exists('data/database/'.. zone_name ..'.lua') then
-    npc_zone_database = require('data/database/'.. zone_name)
-  else
-    npc_zone_database = {}
-  end
-  widescan_by_index, widescan_info, npc_ids_by_index = {}, {}, {}
-  new_npcs_seen = false
-  write_scheduled = false
+  widescan_by_index, widescan_info = {}, {};
+  npc_zone_database, widescan.checked, npc_ids_by_index, widescan.seen = load_database(zone);
+  new_npcs_seen = false;
+  write_scheduled = false;
+  
+  widescan.num_new = 0;
+  widescan.new = {};
   
   if auto_widescanning and not always_widescan then
     auto_widescanning = false
@@ -783,13 +1003,51 @@ function do_widescan(manual)
   if manual or auto_widescanning then
     packets.inject(widescan_packet)
     display("Widescanned!")
+    debug.ws_time = os.clock() + 10
+    coroutine.schedule(function()
+      scan_scheduled = false;
+      if widescan.num_new > 0 then
+        display("New widescan information! (".. widescan.num_new .." NPCs)");
+        schedule_database_write();
+        widescan.num_new = 0;
+        widescan.new = {};
+      else
+        display("No new widescan information.");
+      end
+      debug.ws_time = 0
+    end, 10) -- Enforce a 10s widescan cooldown
   end
   
-  if not manual and auto_widescanning then
-    coroutine.schedule(function() do_widescan() end, 20)
+  if not manual and auto_widescanning and (settings.auto_ws_mode == 2) then
+    scan_scheduled = true
+    debug.ws_auto = 20
+    coroutine.schedule(function()
+      debug.ws_auto = 0
+      do_widescan()
+    end, 20)
   end
 end
 
+
+-- Determines if an NPC would show up on widescan
+--------------------------------------------------
+function scannable(npc_id)
+  local npc = npc_zone_database[npc_id]
+  if npc then
+    if npc['look'] == '00003400' then
+      return false -- "Invisible model" NPCs, like ???, do not show on widescan
+      
+    end
+    
+    if (npc['polutils_name'] == 'NPC') or (npc['polutils_name'] == '     ') then
+      return false -- Likewise, NPCs without real client names aren't intended to be on widescan
+    end
+  end
+  
+  -- Fill this function out with more exclusion rules later
+  
+  return true
+end
 
 -- Prints a message to the chatlog
 --------------------------------------------------
@@ -802,51 +1060,81 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
 
   if (id == 0x00E) then
     local mask = packet['Mask'];
-    if (seen_masks[mask] and (not seen_masks[mask][packet['NPC']])) then
-      local npc_id = packet['NPC'];
-      local npc_info = {}
-      if ((packet['Name'] ~= '') and (not npc_raw_names[packet['NPC']]) and (not (mask == 0x57))) then
-        -- Valid raw name we haven't seen yet is set.
-        npc_raw_names[packet['NPC']] = handle_npc_raw_name(packet['Name']);
+    if seen_masks[mask] then -- Make sure this is an NPC update mask we care about
+      local npc_id = packet['NPC']
+      if not seen_masks[mask][npc_id] then -- We haven't seen a packet with this update mask from this NPC
+        local npc_id = packet['NPC'];
+        local npc_info = {}
+        if ((packet['Name'] ~= '') and (not npc_raw_names[packet['NPC']]) and (not (mask == 0x57))) then
+          -- Valid raw name we haven't seen yet is set.
+          npc_raw_names[packet['NPC']] = handle_npc_raw_name(packet['Name']);
+        end
+        if ((mask == 0x57) or (mask == 0x0F) or (mask == 0x07)) then
+          if (mask == 0x57) then
+            -- Equipped model.
+            npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x44*2));
+          elseif ((mask == 0x0F) or (mask == 0x07)) then
+            -- Basic/standard NPC model.
+            npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x34*2));
+          end
+          npc_looks[npc_id] = npc_info['look'];
+          
+          npc_info['flag'] = byte_string_to_int(string.sub(data:hex(), (0x18*2)+1, (0x1C*2)));
+          npc_info['speed'] = tonumber(string.sub(data:hex(), (0x1C*2)+1, (0x1D*2)), 16);
+          npc_info['speedsub'] = tonumber(string.sub(data:hex(), (0x1D*2)+1, (0x1E*2)), 16);
+          npc_info['animation'] = tonumber(string.sub(data:hex(), (0x1F*2)+1, (0x20*2)), 16);
+          npc_info['animationsub'] = tonumber(string.sub(data:hex(), (0x2A*2)+1, (0x2B*2)), 16);
+          npc_info['namevis'] = tonumber(string.sub(data:hex(), (0x2B*2)+1, (0x2C*2)), 16);
+          npc_info['status'] = tonumber(string.sub(data:hex(), (0x20*2)+1, (0x21*2)), 16);
+          npc_info['flags'] = byte_string_to_int(string.sub(data:hex(), (0x21*2)+1, (0x25*2)));
+          npc_info['name_prefix'] = tonumber(string.sub(data:hex(), (0x27*2)+1, (0x28*2)), 16);
+          
+          if (not basic_npc_info[npc_id]) then
+            -- Give the game a second or two to load the mob into memory before using Windower functions.
+            coroutine.schedule(function() get_npc_name(npc_id) end, 2);
+            coroutine.schedule(function() get_basic_npc_info(data) end, 2.2);
+          end
+          coroutine.schedule(function() log_npc(npc_id, packet['Mask'], npc_info, data) end, 3);
+          seen_masks[mask][npc_id] = true;
+        end
       end
-      if ((mask == 0x57) or (mask == 0x0F) or (mask == 0x07)) then
-        if (mask == 0x57) then
-          -- Equipped model.
-          npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x44*2));
-        elseif ((mask == 0x0F) or (mask == 0x07)) then
-          -- Basic/standard NPC model.
-          npc_info['look'] = string.sub(data:hex(), (0x30*2)+1, (0x34*2));
+      if auto_widescanning and (settings.auto_ws_mode == 1) then
+        if basic_npc_info[npc_id] and scannable(npc_id) and (not widescan.checked[npc_id]) then
+          widescan.checked[npc_id] = true
+          if (not widescan.seen[npc_id]) and (not scan_scheduled) then
+            scan_scheduled = true;
+            coroutine.schedule(function() do_widescan() end, 3.2);
+          end
         end
-        npc_looks[npc_id] = npc_info['look'];
-        
-        npc_info['flag'] = byte_string_to_int(string.sub(data:hex(), (0x18*2)+1, (0x1C*2)));
-        npc_info['speed'] = tonumber(string.sub(data:hex(), (0x1C*2)+1, (0x1D*2)), 16);
-        npc_info['speedsub'] = tonumber(string.sub(data:hex(), (0x1D*2)+1, (0x1E*2)), 16);
-        npc_info['animation'] = tonumber(string.sub(data:hex(), (0x1F*2)+1, (0x20*2)), 16);
-        npc_info['animationsub'] = tonumber(string.sub(data:hex(), (0x2A*2)+1, (0x2B*2)), 16);
-        npc_info['namevis'] = tonumber(string.sub(data:hex(), (0x2B*2)+1, (0x2C*2)), 16);
-        npc_info['status'] = tonumber(string.sub(data:hex(), (0x20*2)+1, (0x21*2)), 16);
-        npc_info['flags'] = byte_string_to_int(string.sub(data:hex(), (0x21*2)+1, (0x25*2)));
-        npc_info['name_prefix'] = tonumber(string.sub(data:hex(), (0x27*2)+1, (0x28*2)), 16);
-        
-        if (not basic_npc_info[npc_id]) then
-          -- Give the game a second or two to load the mob into memory before using Windower functions.
-          coroutine.schedule(function() get_npc_name(npc_id) end, 2);
-          coroutine.schedule(function() get_basic_npc_info(data) end, 2.2);
-        end
-        coroutine.schedule(function() log_npc(npc_id, packet['Mask'], npc_info, data) end, 3);
-        seen_masks[mask][npc_id] = true;
       end
     end
   elseif (id == 0xF4) then
     local index, name, level = packet["Index"], packet["Name"], packet["Level"];
+    local npc_id = npc_ids_by_index[index];
     if (not widescan_by_index[index]) then
       widescan_by_index[index] = {['index']=index,['name']=name,['level']=level};
-      local npc_id = npc_ids_by_index[index];
-      if (npc_id and (not widescan_info[npc_id])) then
+    end
+    
+    if npc_id then
+      if not widescan_info[npc_id] then
         widescan_info[npc_id] = widescan_by_index[index];
         widescan_info[npc_id]['id'] = npc_id;
         write_widescan_info(npc_id);
+      end
+      if not widescan.seen[npc_id] then
+        widescan.seen[npc_id] = level;
+        if npc_zone_database[npc_id] then
+          if (not npc_zone_database[npc_id]['level']) or (not npc_zone_database[npc_id]['level'] ~= level) then
+            npc_zone_database[npc_id]['level'] = level;
+            if npc_zone_database[npc_id]['id'] then
+              if not widescan.new[npc_id] then
+                widescan.new[npc_id] = true;
+                widescan.num_new = widescan.num_new + 1;
+                schedule_database_write();
+              end
+            end
+          end
+        end
       end
     end
   end
@@ -865,7 +1153,7 @@ windower.register_event('addon command',function (command, ...)
     if not auto_widescanning then
       display("Auto Widescan: ON")
       auto_widescanning = true
-      do_widescan()
+      --do_widescan()
     else
       display("Auto Widescan is already ON")
     end
@@ -887,9 +1175,59 @@ windower.register_event('addon command',function (command, ...)
     else
       display("Usage: //npclogger always_widescan on|off")
     end
+  elseif command == 'save' then
+    write_zone_database(current_zone)
+    coroutine.close(scheduled_write_coroutine)
+  elseif command == 'info' then
+    if show_bar then
+      show_bar = false
+      debug.box:hide()
+    else
+      show_bar = true
+      debug.box:show()
+    end
 	end
 end)
 
+windower.register_event('prerender', function()
+  if frame%10 == 0 then
+    if debug.save_time > 0 then
+      debug.box.save_time = pad_right(tostring(((debug.save_time - os.clock()) % 60):floor()), 2)
+    end
+    if debug.ws_time > 0 then
+      debug.box.ws_time = pad_right(tostring(((debug.ws_time - os.clock()) % 60):floor()), 2)
+    end
+    if debug.ws_auto > 0 then
+      debug.box.ws_auto = pad_right(tostring(((debug.ws_auto - os.clock()) % 60):floor()), 2)
+    end
+    
+    local mob = windower.ffxi.get_mob_by_target('t')
+    if mob and mob.id > 0 then
+      if npc_zone_database[mob.id] then
+        debug.box.npc_id = '\\cs(100,255,100)'.. mob.id ..'\\cr'
+      else
+        debug.box.npc_id = '\\cs(255,100,100)'.. mob.id ..'\\cr'
+      end
+      if widescan.seen[mob.id] then
+        debug.box.npc_level = '\\cs(100,255,100)'.. pad_right(tostring(widescan.seen[mob.id]), 3) ..'\\cr'
+      else
+        --if widescan.checked[mob.id] then
+          --debug.box.npc_level = '\\cs(100,255,100)X  \\cr' -- Only use this if we know we checked when the mob was up!
+        --else
+          debug.box.npc_level = '\\cs(255,100,100)?  \\cr'
+        --end
+      end
+    else
+      --debug.box.npc_id = ' -None- '
+      debug.box.npc_id =' -None- '
+      debug.box.npc_level = '-  '
+    end
+    frame = 0
+  end
+  frame = frame + 1
+end)
+
+frame = 0
 setup_zone(windower.ffxi.get_info().zone)
 windower.register_event('incoming chunk', check_incoming_chunk);
 
