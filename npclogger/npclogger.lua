@@ -17,6 +17,9 @@ defaults = T{}
 -- verbosity, when NPCL displays it captured NPC information to the chatlog
 -- 0: Never, 1: When NPC not in database, 2: When NPC first seen during session
 defaults.verbosity = 1
+-- widescan_verbosity, a bitmask of what widescan-related messages to display
+-- 0: Never, 1: New information captured, 2: No new information, 4: Widescanned
+defaults.widescan_verbosity = 1
 -- message_color, the chatlog color code that messages are displayed in
 defaults.message_color = 7
 -- remind_widescan, displays a message a short time after a zone to remind to WS
@@ -1002,17 +1005,23 @@ end
 function do_widescan(manual)
   if manual or auto_widescanning then
     packets.inject(widescan_packet)
-    display("Widescanned!")
+    if bit.band(settings.widescan_verbosity, 4) >= 1 then
+      display("Widescanned!")
+    end
     debug.ws_time = os.clock() + 10
     coroutine.schedule(function()
       scan_scheduled = false;
       if widescan.num_new > 0 then
-        display("New widescan information! (".. widescan.num_new .." NPCs)");
+        if bit.band(settings.widescan_verbosity, 1) >= 1 then
+          display("New Widescan information! (".. widescan.num_new .." NPCs)");
+        end
         schedule_database_write();
         widescan.num_new = 0;
         widescan.new = {};
       else
-        display("No new widescan information.");
+        if bit.band(settings.widescan_verbosity, 2) >= 1 then
+          display("No new Widescan information.");
+        end
       end
       debug.ws_time = 0
     end, 10) -- Enforce a 10s widescan cooldown
@@ -1169,6 +1178,7 @@ windower.register_event('addon command',function (command, ...)
         display("WARNING: This persists across zones, and widescan packets will be sent even when normally impossible!")
       elseif string.lower(args[1]) == 'off' then
         always_widescan = false
+        display("Always Widescan: OFF")
       else
         display("Usage: //npclogger always_widescan on|off")
       end
