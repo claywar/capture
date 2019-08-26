@@ -6,11 +6,13 @@ pack = require('pack')
 bit = require 'bit'
 
 _addon.name = 'PriceLog'
-_addon.version = '0.1.1'
+_addon.version = '0.2.0'
 _addon.author = 'ibm2431'
 _addon.commands = {'pricelog'}
 
 my_name = windower.ffxi.get_player().name
+my_zone = res.zones[windower.ffxi.get_info().zone].en
+my_npc = ''
 
 files = require('files')
 file = T{}
@@ -123,7 +125,7 @@ function write_full_table()
     for _, id in ipairs(sorted_item_ids) do
       -- Now we can use ipairs to guarantee the pairs are gone through in order.
       local item = prices[id]
-      table_to_write = table_to_write .. format_table_entry(id, item['name'], item['price'])
+      table_to_write = table_to_write .. format_table_entry(id, item['name'], item['price'], item['char'], item['zone'], item['npc'])
     end
     table_to_write = table_to_write .. "}\nreturn resale_database"
     file.database:write(table_to_write)
@@ -142,7 +144,10 @@ function add_to_database(id, name, price)
     prices[id] = {
       ['id'] = id,
       ['name'] = name,
-      ['price'] = price
+      ['price'] = price,
+      ['char'] = my_name,
+      ['zone'] = my_zone,
+      ['npc'] = my_npc
     }
     windower.add_to_chat(7, "[PriceLog] Added: ".. id .. " (".. name ..") - ".. price .."g")
     new_items = true
@@ -155,14 +160,20 @@ end
 
 -- Returns a string representing an entry for the lua database
 --------------------------------------------------
-function format_table_entry(item_id, item_name, price)
+function format_table_entry(item_id, item_name, price, char, zone, npc)
+  if not char then char = '' end
+  if not zone then zone = '' end
+  if not npc then npc = '' end
 	return string.format(
-		"    [%d] = {id=%d, name=\"%s\", price=%d},\n",
-		item_id,
-		item_id,
-		string.gsub(item_name, '"', '\"'),
-		price
-	  )
+    "    [%d] = {id=%d, name=\"%s\", price=%d, char=\"%s\", zone=\"%s\", npc=\"%s\"},\n",
+    item_id,
+    item_id,
+    string.gsub(item_name, '"', '\"'),
+    price,
+    char,
+    zone,
+    npc
+  )
 end
 
 -- Checks the current inventory for any unseen items
@@ -194,7 +205,12 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   local mob_name
   local log_string = "Incoming: "
   if (id == 0x03D) then
-    if update_packet['Type'] == 0 then -- Make sure this is a price response and not sale finalization
+    local type = 1
+    if update_packet['Type'] then
+      type = update_packet['Type']
+    end
+    
+    if type == 0 then -- Make sure this is a price response and not sale finalization
       local index = update_packet['Inventory Index']
       local item_id = windower.ffxi.get_items(0, index)['id']
       local item = res.items[item_id]
@@ -202,6 +218,9 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
       log_string = log_string .. '0x03D (Price Response), '
       log_string = log_string .. 'Item: ' .. item_id .. ' (' .. item['en'] ..')'
       log_string = log_string .. ' Price: ' .. update_packet['Price']
+      log_string = log_string .. ' Character: ' .. my_name
+      log_string = log_string .. ' Zone: ' .. my_zone
+      log_string = log_string .. ' NPC: ' .. my_npc
 
       if not checked_unseen then
         check_for_unseen()
@@ -214,9 +233,28 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
   end
 end
 
+-- Checks outgoing chunks for NPC pokes to track NPC being talked to
+--------------------------------------------------
+function check_outgoing_chunk(id, data, modified, injected, blocked)
+  local packet = packets.parse('outgoing', data)
+  if (id == 0x01A) then
+    local mob = windower.ffxi.get_mob_by_id(packet['Target'])
+    if mob then
+      my_npc = mob.name
+    end
+  end
+end
+
+-- Keeps track of current zone so we don't ping get_info every time
+--------------------------------------------------
+windower.register_event('zone change', function(new, old)
+  my_zone = res.zones[new].en
+end)
+
 windower.register_event('zone change', function(new, old)
   setup_zone(new)
 end)
 
 windower.register_event('incoming chunk', check_incoming_chunk)
+windower.register_event('outgoing chunk', check_outgoing_chunk)
 setup_zone(windower.ffxi.get_info().zone)
