@@ -250,6 +250,7 @@ function check_incoming_chunk(id, data, modified, injected, blocked)
     type = 'NPC Chat (0x036): ';
     type_color = colors.npc_chat;
     actor = update_packet['Actor'];
+    colored_actor = actor
     mob = windower.ffxi.get_mob_by_id(update_packet['Actor']);
     if (mob) then mob_name = mob.name end;
     if (mob_name) then
