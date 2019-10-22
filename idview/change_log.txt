@@ -1,0 +1,32 @@
+ID View Changelog
+
+v001 (2019/10/21)
+----------------------------------------------------------------------------------
+- Essentially rewrites ID View from the ground up as a "real release"
+
+- Started to move all my capture addons over to use a unified library. At the
+  moment, ID View is the first/only to use this new library system.
+
+- A new Windower text box will display on triggered packets. This box will stay
+  displayed on the screen while an event plays, so you can see/ponder params
+  while characters are talking and potentially pushing the "chatlog only"
+  printing out of the visible chat log. Boxes can be set to not display.
+  Settings XML (see below): show_box true|false
+
+- New settings file will be created on first load, and loaded from afterwards.
+  This file has settings for colors, whether the new text box displays, where,
+  whether it auto hides after an event, how many boxes to display at once, 
+  and how long of a timer after an event for it to auto hide each update type
+
+- By request, ID View can now be set to a certain mode via the //idview mode NAME command:
+  OFF:     ID View stops taking action on packet triggers
+  INFO:    ID View will display event information, but not write them to file
+  PASSIVE: ID View will write to file, but not actively display event information ("stealth")
+  ACTIVE:  ID View will both display event information, and write it to file (classic behavior)
+
+- New commands added:
+  mode: Sets the mode for ID View (see above). Usage: //idview mode passive
+  color_test: Displays the colorized integers that ID View uses to colorize information with.
+              You can look at the colors, then put the code into your settings XML's tags.
+  ver: Spits out the current ID View version, and the date "released".
+       Also spits out the current capture library version, and the version that ID View "expects".
