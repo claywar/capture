@@ -1,5 +1,20 @@
 ID View Changelog
 
+v002 (2019/10/23)
+----------------------------------------------------------------------------------
+- Requires library v002.
+
+- ID View will now check against the loaded library at start and warn the user
+  if there is a version mismatch.
+
+- Added command //idview box_test.
+  Input it to display a test box you can drag and move to become a new "base location"
+  for boxes displayed by ID View. When the box is in the desired position, input the
+  command again the save this new starting location.
+
+- Added a small 0.2 wait to the auto-hide time, in attempts of mitigating the box
+  disappearing during events due to event option->updates when time is set to 0.
+
 v001 (2019/10/21)
 ----------------------------------------------------------------------------------
 - Essentially rewrites ID View from the ground up as a "real release"

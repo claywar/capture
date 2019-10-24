@@ -1,8 +1,8 @@
 
 _addon.name = 'ID View'
-_addon.version = '001'
-_addon.date = '2019/10/21'
-_addon.lib_version = '001'
+_addon.version = '002'
+_addon.date = '2019/10/23'
+_addon.lib_version = '002'
 _addon.author = 'ibm2431'
 _addon.commands = {'idview'}
 
@@ -202,9 +202,10 @@ idview.packets = {
 -- COMMANDS
 ---------------------------------------------------------------------------------
 idview.help_text = {
+  ['box_test'] = "Displays a test box. Call again to hide, and save setting.",
   ['color_test'] = "Displays the color codes used by the addon",
+  ['mode'] = "Sets mode: OFF | INFO | PASSIVE | ACTIVE",
   ['ver'] = "Shows addon (and library) version and date",
-  ['mode'] = "Sets mode: OFF | INFO | PASSIVE | ACTIVE"
 }
 
 idview.commands = {
@@ -216,6 +217,9 @@ idview.commands = {
       idview.vars.color_testing:hide()
       idview.vars.color_testing = false
     end
+  end,
+  ['box_test'] = function ()
+    idview.testBox()
   end,
   ['ver'] = function()
     windower.add_to_chat(1, idview.colors.log.SYSTEM .. _addon.name .. ': v'.. _addon.version .. ' ['.. _addon.date ..']')
@@ -264,7 +268,7 @@ end
 
 -- Handles writing an event to the info box
 --------------------------------------------------
-idview.writeBox = function(template, info)
+idview.writeBox = function(info)
   local packet_type = idview.packets[info.id]
   local template = packet_type.template
   
@@ -316,11 +320,11 @@ idview.updateBox = function(info)
       for i = 1, #idview.vars.boxes do
         texts.pos(idview.vars.boxes[i], idview.vars.box_positions[i + 1].x, idview.vars.box_positions[i + 1].y)
       end
-      new_box = idview.writeBox(info.template, info)
+      new_box = idview.writeBox(info)
       table.insert(idview.vars.boxes, 1, new_box)
       new_box:show()
       if idview.settings.auto_hide and not idview.vars.hide_ticking then
-        coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time)
+        coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time + 0.2)
         idview.vars.hide_ticking = true
       end
     elseif idview.settings.auto_hide and #idview.vars.boxes > 0 then
@@ -333,11 +337,46 @@ idview.updateBox = function(info)
         if #idview.vars.boxes == 0 then
           idview.vars.hide_ticking = false
         else
-          coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time)
+          coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time + 0.2)
         end
       else
-        coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time)
+        coroutine.schedule(function() idview.updateBox() end, idview.settings.auto_hide_time + 0.2)
       end
+    end
+  end
+end
+
+-- Displays a test box that can be used to display / update box settings
+--------------------------------------------------
+idview.testBox = function()
+  if not idview.vars.testing_box then
+    local info = {
+      dir = 'INCOMING <',
+      id = 0x034,
+      actor = '12345678 (Test Moogle)',
+      event = '12345',
+      params = {'123', '1234', '12345', '123456', '1234567', '12345678', '123456789', '1234567890'}
+    }
+    idview.vars.testing_box = idview.writeBox(info)
+    idview.vars.testing_box:show()
+
+  else
+    local test_x, test_y = texts.pos(idview.vars.testing_box)
+    idview.settings.box.pos.x = test_x
+    idview.settings.box.pos.y = test_y
+    config.save(idview.settings)
+    idview.vars.testing_box:hide()
+    idview.vars.testing_box = nil
+    idview.vars.initial_x = idview.settings.box.pos.x
+    idview.vars.initial_y = idview.settings.box.pos.y
+    idview.vars.box_positions = {
+      [1] = {x = idview.vars.initial_x, y = idview.vars.initial_y}
+    }
+    for i = 2, 10 do
+      idview.vars.box_positions[i] = {
+        x = idview.vars.initial_x,
+        y = idview.vars.initial_y - (((idview.settings.box.text.size + idview.settings.box.spacing) * 4) * (i - 1))
+      }
     end
   end
 end
@@ -459,6 +498,7 @@ end
 -- Initializes and starts ID view
 --------------------------------------------------
 idview.initialize = function()
+  lib.checkLibVer(_addon.name, _addon.lib_version, idview.colors.log.SYSTEM)
   windower.register_event('zone change', function(new, old) idview.setupZone(new) end)
   windower.register_event('outgoing chunk', idview.checkChunk)
   windower.register_event('incoming chunk', idview.checkChunk)

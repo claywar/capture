@@ -11,8 +11,8 @@ files = require('files')
 -------------------------------------------
 
 lib = {}
-lib.version = '001'
-lib.date = '2019/10/21'
+lib.version = '002'
+lib.date = '2019/10/23'
 
 lib.color = {
    [1] = {string.char(0x1F,   1), '\\cs(255, 255, 255)'},
@@ -251,5 +251,13 @@ lib.setMode = function(settings, new_mode, color_code, addon_name)
     else
       windower.add_to_chat(1, color_code .. 'Unknown mode: '.. new_mode ..'. Ignored.')
     end
+  end
+end
+
+-- Changes the mode of an addon
+--------------------------------------------------
+lib.checkLibVer = function(addon_name, expected_lib_ver, color_code)
+  if lib.version ~= expected_lib_ver then
+    windower.add_to_chat(1, color_code .. '['.. addon_name .. '] LIBRARY WARNING - Expected: v'.. expected_lib_ver ..'. Current: v'.. lib.version)
   end
 end
