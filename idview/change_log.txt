@@ -1,5 +1,9 @@
 ID View Changelog
 
+v003 (2019/10/26)
+----------------------------------------------------------------------------------
+- Fixed a bug where mob special spawn packets were being confused for event option packets
+
 v002 (2019/10/23)
 ----------------------------------------------------------------------------------
 - Requires library v002.

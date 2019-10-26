@@ -1,7 +1,7 @@
 
 _addon.name = 'ID View'
-_addon.version = '002'
-_addon.date = '2019/10/23'
+_addon.version = '003'
+_addon.date = '2019/10/26'
 _addon.lib_version = '002'
 _addon.author = 'ibm2431'
 _addon.commands = {'idview'}
@@ -152,6 +152,7 @@ idview.file.raw = files.new('data/'.. idview.vars.my_name ..'/logs/raw.log', tru
 
 idview.packets = {
   [0x032] = {
+    dir = 'INCOMING <',
     text = 'CS Event (0x032): ',
     box_color = idview.colors.box.EVENT_HEADER,
     log_color = idview.colors.log.EVENT_HEADER,
@@ -161,6 +162,7 @@ idview.packets = {
     template = idview.template.EVENT,
   },
   [0x034] = {
+    dir = 'INCOMING <',
     text = 'CS Event + Params (0x034): ',
     box_color = idview.colors.box.EVENT_HEADER,
     log_color = idview.colors.log.EVENT_HEADER,
@@ -170,6 +172,7 @@ idview.packets = {
     template = idview.template.EVENT,
   },
   [0x05C] = {
+    dir = 'INCOMING <',
     text = 'Event Update (0x05C): ',
     box_color = idview.colors.box.EVENT_UPDATE,
     log_color = idview.colors.log.EVENT_UPDATE,
@@ -179,6 +182,7 @@ idview.packets = {
     template = idview.template.UPDATE,
   },
   [0x036] = {
+    dir = 'INCOMING <',
     text = 'NPC Chat (0x036): ',
     box_color = idview.colors.box.NPC_CHAT,
     log_color = idview.colors.log.NPC_CHAT,
@@ -188,6 +192,7 @@ idview.packets = {
     template = idview.template.NPC_CHAT,
   },
   [0x05B] = {
+    dir = 'OUTGOING >',
     text = 'Event Option (0x05B): ',
     box_color = idview.colors.box.EVENT_OPTION,
     log_color = idview.colors.log.EVENT_OPTION,
@@ -420,22 +425,21 @@ end
 
 -- Checks incoming chunks for event CSes or NPC chats and logs them
 --------------------------------------------------
-idview.checkChunk = function(id, data, modified, injected, blocked)
+idview.checkChunk = function(dir, id, data)
   if idview.settings.mode == lib.mode.OFF then
     return
   end
   
-  if (idview.packets[id]) then
+  if idview.packets[id] and (idview.packets[id].dir == dir) then
     local update_packet = {}
     local info = {
-      id = id
+      id = id,
+      dir = dir
     }
     if id == 0x05B then
-      info.dir = 'OUTGOING >'
       update_packet = packets.parse('outgoing', data)
       idview.vars.in_event = false
     else
-      info.dir = 'INCOMING <'
       update_packet = packets.parse('incoming', data)
     end
     
@@ -500,8 +504,8 @@ end
 idview.initialize = function()
   lib.checkLibVer(_addon.name, _addon.lib_version, idview.colors.log.SYSTEM)
   windower.register_event('zone change', function(new, old) idview.setupZone(new) end)
-  windower.register_event('outgoing chunk', idview.checkChunk)
-  windower.register_event('incoming chunk', idview.checkChunk)
+  windower.register_event('outgoing chunk', function(id, data, modified, injected, blocked) idview.checkChunk('OUTGOING >', id, data) end)
+  windower.register_event('incoming chunk', function(id, data, modified, injected, blocked) idview.checkChunk('INCOMING <', id, data) end)
   windower.register_event('addon command', idview.command)
   idview.setupZone(windower.ffxi.get_info().zone)
 end
