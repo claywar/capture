@@ -1,5 +1,28 @@
 ID View Changelog
 
+v004 (2019/11/06)
+----------------------------------------------------------------------------------
+- Requires library v003.
+
+- Updated ID View to leverage newer capture library for working with text boxes,
+  and some other internal code improvements
+
+- Fixed bug where Event+Param (0x034) packets had NPC ID listed as the first param,
+  with the actual params shifted one spot backward, and param 8 being dropped
+
+- Fixed a bug where the default box background settings weren't being set properly.
+  To fix settings made by older versions, you can either delete your settings.xml and
+  ID View will regenerate a new one on next load, or you can (with ID View unloaded)
+  manually edit settings.xml to move the <bg></bg> content inside the <box></box> tag
+
+- Singularized references to colors. Users with older settings.xml will need to edit
+  them and change the <colors></colors> tags to read <color></color>. (Or delete and 
+  generate a new one with defaults)
+
+- Fixed a bug where Event (0x032) packets were being listed with params despite not
+  actually having any
+
+
 v003 (2019/10/26)
 ----------------------------------------------------------------------------------
 - Fixed a bug where mob special spawn packets were being confused for event option packets
