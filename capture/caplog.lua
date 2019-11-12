@@ -30,7 +30,7 @@ end
 
 caplog.defaults = T{}
 
-caplog.defaults.mode = lib.mode.ACTIVE
+caplog.defaults.mode = lib.mode.PASSIVE
 caplog.defaults.file_path = 'data/caplog/'
 
 caplog.defaults.log_say = true
@@ -98,7 +98,7 @@ caplog.commands = {
   ['ver'] = function()
     lib.displayVer(caplog)
   end,
-  ['show'] = function(args)
+  ['log'] = function(args)
     local chat_modes = {
       say = true,
       shout = true,
@@ -109,7 +109,7 @@ caplog.commands = {
     }
     local chat_mode = chat_modes[args[2]]
     if chat_mode then
-      lib.setToggle(caplog, 'show_'.. chat_mode, args[3])
+      lib.setToggle(caplog, 'log_'.. chat_mode, args[3])
     end
   end,
   ['block'] = function(args)
