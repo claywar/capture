@@ -426,16 +426,18 @@ npcl.command = function(cmd, ...)
   lib.command(npcl, cmd, ...)
 end
 
--- Logs basic NPC information to a table
+-- Fetches basic NPC information from the client
 ----------------------------------------------
-npcl.setBasicNpcInfo = function(db, npc_id, packet)
+npcl.getBasicNpcInfo = function(npc_id, raw_name, look, packet)
   local name = ''
   local polutils_name = ''
 
-  if not db.npc_info[npc_id] then
-    db.npc_info[npc_id] = {id = npc_id}
+  local npc = {}
+  if raw_name ~= '' then
+    npc.raw_name = raw_name
   end
-  local npc = db.npc_info[npc_id]
+  
+  npc.look = look
   
   local mob = windower.ffxi.get_mob_by_id(npc_id)
   if mob and mob.name ~= '' then
@@ -498,17 +500,29 @@ npcl.setBasicNpcInfo = function(db, npc_id, packet)
       seen = 'X',
       level = 'X'
     }
-    --index_info.level = 'X'
   end
   
-  if npcl.settings.mode == lib.mode.CAPTURE then
-    -- The db was passed in was the capture DB.
-    -- Need to write the basic information to the main db
-    local main_db_copy = {}
-    for k, v in pairs(db.npc_info[npc_id]) do
-      main_db_copy[k] = v
-    end
-    npcl.db.main.npc_info[npc_id] = main_db_copy
+  return npc
+end
+
+-- Given a NPC and basic info, writes the basic information to the NPC
+----------------------------------------------
+npcl.setBasicNpcInfo = function(npc, basic_info)
+  npc.raw_name = basic_info.raw_name
+  npc.name = basic_info.name
+  npc.polutils_name = basic_info.polutils_name
+  npc.type = basic_info.type
+  npc.look = basic_info.look
+  npc.index = basic_info.index
+  npc.x = basic_info.x
+  npc.y = basic_info.y
+  npc.z = basic_info.z
+  npc.r = basic_info.r
+  npc.scannable = basic_info.scannable
+  
+  if not basic_info.scannable then
+    npc.level = basic_info.level
+    npc.widescan = basic_info.widescan
   end
 end
 
@@ -950,11 +964,13 @@ npcl.handleMobUpdate = function(data)
       new_for = npcl.db.main
     end
     
+    local raw_name = ''
     local npc = { id = npc_id }
     if not saw_mask then
       if packet['Name'] ~= '' and not npc.raw_name and (not (mask == 0x57)) then
         npc.raw_name = lib.handleNpcRawName(packet['Name']) -- Valid raw name we haven't seen yet is set.
         npc.name = npc.raw_name
+        raw_name = npc.raw_name
       end
       if (mask == 0x57) or (mask == 0x0F) or (mask == 0x07) then
         npc.flag         = lib.byteStringToInt(string.sub(data:hex(), (0x18*2)+1, (0x1C*2)))
@@ -967,10 +983,11 @@ npcl.handleMobUpdate = function(data)
         npc.flags        = lib.byteStringToInt(string.sub(data:hex(), (0x21*2)+1, (0x25*2)))
         npc.name_prefix  = tonumber(string.sub(data:hex(), (0x27*2)+1, (0x28*2)), 16)
 
+        local look = ''
         if mask == 0x57 then -- Equipped model.
-          npc.look = string.sub(data:hex(), (0x30*2)+1, (0x44*2))
+          look = string.sub(data:hex(), (0x30*2)+1, (0x44*2))
         elseif (mask == 0x0F) or (mask == 0x07) then -- Basic/standard NPC model.
-          npc.look = string.sub(data:hex(), (0x30*2)+1, (0x34*2))
+          look = string.sub(data:hex(), (0x30*2)+1, (0x34*2))
         end
         
         -- Cross link any previously encountered widescan information
@@ -1001,7 +1018,14 @@ npcl.handleMobUpdate = function(data)
         end
         
         if (not new_for.npc_info[npc_id]) or (new_for.npc_info[npc_id] and (not new_for.npc_info[npc_id].polutils_name)) then
-          coroutine.schedule(function() npcl.setBasicNpcInfo(new_for, npc_id, packet) end, 2.4)
+          coroutine.schedule(function()
+            local basic_info = npcl.getBasicNpcInfo(npc_id, raw_name, look, packet)
+            npcl.setBasicNpcInfo(new_for.npc_info[npc_id], basic_info)
+            if npcl.settings.mode == lib.mode.CAPTURE then
+              -- new_for is the capture db; we need to clone the basic information to the main DB
+              npcl.setBasicNpcInfo(npcl.db.main.npc_info[npc_id], basic_info)
+            end
+          end, 2.4)
           coroutine.schedule(function()
             if npcl.vars.auto_widescanning and (npcl.settings.auto_ws_mode == 1) then
               if npc.scannable and (not npc.widescan.checked) then
