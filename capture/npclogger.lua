@@ -428,11 +428,16 @@ end
 
 -- Logs basic NPC information to a table
 ----------------------------------------------
-npcl.getBasicNpcInfo = function(npc, packet)
+npcl.setBasicNpcInfo = function(db, npc_id, packet)
   local name = ''
   local polutils_name = ''
+
+  if not db.npc_info[npc_id] then
+    db.npc_info[npc_id] = {id = npc_id}
+  end
+  local npc = db.npc_info[npc_id]
   
-  local mob = windower.ffxi.get_mob_by_id(npc.id)
+  local mob = windower.ffxi.get_mob_by_id(npc_id)
   if mob and mob.name ~= '' then
     npc.polutils_name = mob.name
   end
@@ -495,7 +500,16 @@ npcl.getBasicNpcInfo = function(npc, packet)
     }
     --index_info.level = 'X'
   end
-  return npc
+  
+  if npcl.settings.mode == lib.mode.CAPTURE then
+    -- The db was passed in was the capture DB.
+    -- Need to write the basic information to the main db
+    local main_db_copy = {}
+    for k, v in pairs(db.npc_info[npc_id]) do
+      main_db_copy[k] = v
+    end
+    npcl.db.main.npc_info[npc_id] = main_db_copy
+  end
 end
 
 -- Returns a string of an NPC's basic info, to be printed when logging
@@ -712,7 +726,7 @@ npcl.writeZoneDatabase = function(zone_left)
       for _, id in ipairs(sorted_npc_ids) do
         -- Now we can use ipairs to guarantee the pairs are gone through in order.
         local npc = melded[id]
-        if npc['id'] then -- Make sure this wasn't an almost empty entry from Widescan.
+        if npc and npc['raw_packet'] then -- Make sure this wasn't an almost empty entry from Widescan.
           string_to_write = string_to_write .. npcl.formatDatabaseEntry(npc)
         end
       end
@@ -737,7 +751,7 @@ npcl.writeZoneDatabase = function(zone_left)
         for _, id in ipairs(sorted_npc_ids) do
           -- Now we can use ipairs to guarantee the pairs are gone through in order.
           local npc = capture_melded[id]
-          if npc and npc['id'] then -- Make sure this wasn't an almost empty entry from Widescan.
+          if npc and npc['raw_packet'] then -- Make sure this wasn't an almost empty entry from Widescan.
             string_to_write = string_to_write .. npcl.formatDatabaseEntry(npc)
           end
         end
@@ -987,7 +1001,7 @@ npcl.handleMobUpdate = function(data)
         end
         
         if (not new_for.npc_info[npc_id]) or (new_for.npc_info[npc_id] and (not new_for.npc_info[npc_id].polutils_name)) then
-          coroutine.schedule(function() npc = npcl.getBasicNpcInfo(npc, packet) end, 2.4)
+          coroutine.schedule(function() npcl.setBasicNpcInfo(new_for, npc_id, packet) end, 2.4)
           coroutine.schedule(function()
             if npcl.vars.auto_widescanning and (npcl.settings.auto_ws_mode == 1) then
               if npc.scannable and (not npc.widescan.checked) then
