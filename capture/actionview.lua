@@ -517,7 +517,10 @@ actionview.startCapture = function(file_root)
       _meta = {}
     },
     zone = {
-      _meta = {}
+      _meta = {
+        num = 0,
+        loaded_num = 0,
+      }
     }
   }
 
@@ -530,8 +533,10 @@ end
 -- Stops a capture
 ---------------------------------------------------------------------
 actionview.stopCapture = function()
+--[[
   actionview.writeDatabases(actionview.vars.current_zone)
   coroutine.close(actionview.vars.scheduled_write_coroutine)
+--]]
 end
 
 -- Sets up tables and files for use in the current zone
