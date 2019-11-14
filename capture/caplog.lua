@@ -210,10 +210,15 @@ caplog.logMessage = function(message)
       timestamp = os.date(('[%H:%M:%S] ':gsub('%${([%l%d_]+)}', {})))
     end
     
-    if caplog.settings.mode == lib.mode.CAPTURE then
-      caplog.file.capture:append(timestamp .. message:strip_format() .. '\n')
+    local to_log = timestamp .. message:strip_format()
+    
+    if to_log ~= caplog.vars.last_line then
+      caplog.vars.last_line = to_log
+      if caplog.settings.mode == lib.mode.CAPTURE then
+        caplog.file.capture:append(timestamp .. message:strip_format() .. '\n')
+      end
+      caplog.file.log:append(timestamp .. message:strip_format() .. '\n')
     end
-    caplog.file.log:append(timestamp .. message:strip_format() .. '\n')
   end
 end
 
@@ -279,6 +284,8 @@ caplog.initialize = function()
   caplog.vars = {}
   caplog.vars.my_name = windower.ffxi.get_player().name
   caplog.vars.previous_mode = caplog.settings.mode
+  
+  caplog.vars.last_line = ''
 
   caplog.file = T{}
   caplog.file.log = files.new(caplog.settings.file_path.. caplog.vars.my_name ..'.txt', true)
