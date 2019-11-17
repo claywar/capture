@@ -7,8 +7,8 @@ npcl.info = {
   log_name = 'NPCL',
   box_name = 'NPCL',
   version = '000',
-  date = '2019/11/11',
-  lib_version = '004',
+  date = '2019/11/16',
+  lib_version = '005',
   author = 'ibm2431',
   commands = {'npclogger', 'npcl'},
   key = 'npcl',
@@ -596,21 +596,21 @@ npcl.logNpc = function(npc, mask, data)
     local log_raw = npcl.formatLogRaw(npc, mask, data)
     local log_table = npcl.formatLogPacketToTable(npc, data)
     
-    npcl.file.full:append(log_raw)
-    npcl.file.packet_table:append(log_table)
+    lib.fileAppend(npcl.file.full, log_raw)
+    lib.fileAppend(npcl.file.packet_table, log_table)
     
     if npcl.settings.mode == lib.mode.CAPTURE then
-      npcl.file.capture.full:append(log_raw)
-      npcl.file.capture.packet_table:append(log_table)
+      lib.fileAppend(npcl.file.capture.full, log_raw)
+      lib.fileAppend(npcl.file.capture.packet_table, log_table)
     end
     
     if npc.widescan.level and npc.name and (not npc.widescan.seen) and npc.scannable then
       npc.widescan.seen = npc.widescan.level
       local widescan_string = npcl.formatWidescanInfo(npc)
-      npcl.file.widescan:append(widescan_string)
+      lib.fileAppend(npcl.file.widescan, widescan_string)
       
       if npcl.settings.mode == lib.mode.CAPTURE then
-        npcl.file.capture.widescan:append(widescan_string)
+        lib.fileAppend(npcl.file.capture.widescan, widescan_string)
       end
     end
 
@@ -754,6 +754,7 @@ npcl.writeZoneDatabase = function(zone_left)
       local capture_zone_database = npcl.loadDatabase(capture_old_zone_path)
       local capture_melded, capture_updated_npcs = lib.meldDatabases(npcl.db.capture.npc_info, capture_zone_database, npcl.shouldUpdate)
       if capture_updated_npcs > 0 then
+        sorted_npc_ids = {}
         -- For the love of Altana, convert NPCL to use lib's nice database writing function
         -- Lua can't natively sort by key, so we need to build a sorted table of IDs first.
         for k, _ in pairs(capture_melded) do
@@ -834,9 +835,9 @@ end
 npcl.setupZone = function(zone, zone_left)
   npcl.vars.current_zone = zone
   local zone_name = res.zones[zone].en
-  npcl.file.packet_table = files.new(npcl.settings.file_path.. npcl.vars.my_name ..'/tables/'.. zone_name ..'.lua', true)
-  npcl.file.full         = files.new(npcl.settings.file_path.. npcl.vars.my_name ..'/logs/'.. zone_name ..'.log', true)
-  npcl.file.widescan     = files.new(npcl.settings.file_path.. npcl.vars.my_name ..'/widescan/'.. zone_name ..'.log', true)
+  npcl.file.packet_table = lib.fileOpen(npcl.settings.file_path.. npcl.vars.my_name ..'/tables/'.. zone_name ..'.lua')
+  npcl.file.full         = lib.fileOpen(npcl.settings.file_path.. npcl.vars.my_name ..'/logs/'.. zone_name ..'.log')
+  npcl.file.widescan     = lib.fileOpen(npcl.settings.file_path.. npcl.vars.my_name ..'/widescan/'.. zone_name ..'.log')
   
   if zone_left and npcl.vars.new_npcs_seen then
     npcl.writeZoneDatabase(zone_left)
@@ -850,9 +851,9 @@ npcl.setupZone = function(zone, zone_left)
     npcl.db.capture.npc_info, npcl.db.capture.index_info = npcl.loadDatabase(npcl.vars.capture_root.. 'database/'.. zone_name, zone)
     npcl.db.capture.widescan.num_new = 0
     npcl.db.capture.widescan.new = {}
-    npcl.file.capture.packet_table = files.new(npcl.vars.capture_root.. 'tables/'.. zone_name ..'.lua', true)
-    npcl.file.capture.full         = files.new(npcl.vars.capture_root.. 'logs/'.. zone_name ..'.log', true)
-    npcl.file.capture.widescan     = files.new(npcl.vars.capture_root.. 'widescan/'.. zone_name ..'.log', true)
+    npcl.file.capture.packet_table = lib.fileOpen(npcl.vars.capture_root.. 'tables/'.. zone_name ..'.lua')
+    npcl.file.capture.full         = lib.fileOpen(npcl.vars.capture_root.. 'logs/'.. zone_name ..'.log')
+    npcl.file.capture.widescan     = lib.fileOpen(npcl.vars.capture_root.. 'widescan/'.. zone_name ..'.log')
   end
   
   npcl.vars.new_npcs_seen = false
@@ -1130,9 +1131,9 @@ npcl.handleWidescanUpdate = function(data)
       
       local widescan_string = npcl.formatWidescanInfo(npc)
       
-      npcl.file.widescan:append(widescan_string)
+      lib.fileAppend(npcl.file.widescan, widescan_string)
       if npcl.settings.mode == lib.mode.CAPTURE then
-        npcl.file.capture.widescan:append(widescan_string)
+        lib.fileAppend(npcl.file.capture.widescan, widescan_string)
       end
     end
   end

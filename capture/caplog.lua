@@ -6,9 +6,9 @@ caplog.info = {
   name = 'CaptureLogger',
   log_name = 'CapLog',
   box_name = 'CL',
-  version = '001',
-  date = '2019/11/11',
-  lib_version = '004',
+  version = '002',
+  date = '2019/11/16',
+  lib_version = '005',
   author = 'ibm2431',
   commands = {'caplog','cl'},
   key = 'caplog',
@@ -215,9 +215,9 @@ caplog.logMessage = function(message)
     if to_log ~= caplog.vars.last_line then
       caplog.vars.last_line = to_log
       if caplog.settings.mode == lib.mode.CAPTURE then
-        caplog.file.capture:append(timestamp .. message:strip_format() .. '\n')
+        lib.fileAppend(caplog.file.capture, timestamp .. message:strip_format() .. '\n')
       end
-      caplog.file.log:append(timestamp .. message:strip_format() .. '\n')
+      lib.fileAppend(caplog.file.log, timestamp .. message:strip_format() .. '\n')
     end
   end
 end
@@ -227,7 +227,8 @@ end
 caplog.startCapture = function()
   local date = os.date('*t')
   local filename = '%s_%.4u.%.2u.%.2u.txt':format(caplog.vars.my_name, date.year, date.month, date.day)
-  caplog.file.capture = files.new(caplog.vars.capture_root.. filename, true)
+  
+  caplog.file.capture = lib.fileOpen(caplog.vars.capture_root.. filename)
 end
 
 -- Stops logging to a capture file
@@ -238,7 +239,7 @@ caplog.stopCapture = function()
     timestamp = os.date(('[%H:%M:%S] ':gsub('%${([%l%d_]+)}', {})))
   end
   if caplog.settings.mode == lib.mode.CAPTURE then
-    caplog.file.capture:append(timestamp .. 'Capture stopped.' .. '\n')
+    lib.fileAppend(caplog.file.capture, timestamp .. 'Capture stopped.' .. '\n')
   end
 end
 
@@ -288,8 +289,7 @@ caplog.initialize = function()
   caplog.vars.last_line = ''
 
   caplog.file = T{}
-  caplog.file.log = files.new(caplog.settings.file_path.. caplog.vars.my_name ..'.txt', true)
-  caplog.file.capture = files.new(caplog.settings.file_path.. caplog.vars.my_name ..'.txt', true)
+  caplog.file.log = lib.fileOpen(caplog.settings.file_path.. caplog.vars.my_name ..'.txt')
 
   lib.checkLibVer(caplog)
   windower.register_event("incoming text", caplog.checkMessage)

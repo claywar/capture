@@ -6,9 +6,9 @@ actionview.info = {
   name = 'ActionView',
   log_name = 'AView',
   box_name = 'AV',
-  version = '002',
-  date = '2019/11/11',
-  lib_version = '004',
+  version = '003',
+  date = '2019/11/16',
+  lib_version = '005',
   author = 'ibm2431',
   commands = {'actionview','actview','aview'},
   key = 'actionview',
@@ -359,12 +359,12 @@ actionview.recordAction = function(result, str_info)
   local new_mob_ability = actionview.addActionToMobList(actionview.db.data, result)
 
   local simple_string = actionview.buildSimpleString(str_info)
-  actionview.file.simple:append(simple_string .. "\n\n")
+  lib.fileAppend(actionview.file.simple, simple_string .. "\n\n")
 
   if actionview.settings.mode == lib.mode.CAPTURE then
     new_ability = actionview.addActionToCategory(actionview.db.data.capture, result)
     new_mob_ability = actionview.addActionToMobList(actionview.db.data.capture, result)
-    actionview.file.capture.simple:append(simple_string .. "\n\n")
+    lib.fileAppend(actionview.file.capture.simple, simple_string .. "\n\n")
   end
   
   if new_ability or new_mob_ability then
@@ -549,10 +549,10 @@ actionview.setupZone = function(zone)
   actionview.vars.zone_start = bit.lshift(zone, 12) + 0x1000000
   actionview.vars.zone_end = actionview.vars.zone_start + 1024 -- Full block of NPCs and mobs
   
-  actionview.file.simple = files.new(actionview.settings.file_path..'simple/'.. current_zone ..'.log', true)
+  actionview.file.simple = lib.fileOpen(actionview.settings.file_path..'simple/'.. current_zone ..'.log')
   
   if actionview.settings.mode == lib.mode.CAPTURE then
-    actionview.file.capture.simple = files.new(actionview.vars.capture_root ..'simple/'.. current_zone ..'.log', true)
+    actionview.file.capture.simple = lib.fileOpen(actionview.vars.capture_root ..'simple/'.. current_zone ..'.log')
   end
 end
 
@@ -678,7 +678,7 @@ actionview.initialize = function()
 
   actionview.file = T{}
   actionview.file.capture = T{}
-  actionview.file.simple = files.new(actionview.settings.file_path.. actionview.vars.my_name ..'/logs/simple.log', true)
+  actionview.file.simple = lib.fileOpen(actionview.settings.file_path.. actionview.vars.my_name ..'/logs/simple.log')
 
   lib.checkLibVer(actionview)
   lib.formatDatabaseStrings(actionview)

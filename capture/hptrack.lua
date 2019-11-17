@@ -6,8 +6,8 @@ hptrack.info = {
   log_name = 'HPT',
   box_name = 'HPT',
   version = '000',
-  date = '2019/11/11',
-  lib_version = '004',
+  date = '2019/11/16',
+  lib_version = '005',
   author = 'ibm2431',
   commands = {'hptrack','hpt'},
   key = 'hptrack',
@@ -65,10 +65,10 @@ hptrack.processDeath = function(mob_id)
   end
   
   if hptrack.settings.mode >= lib.mode.PASSIVE then
-    hptrack.file.simple:append(log_string .. "\n\n")
+    lib.fileAppend(hptrack.file.simple, log_string .. "\n\n")
     
     if hptrack.settings.mode == lib.mode.CAPTURE then
-      hptrack.file.capture.simple:append(log_string .. "\n\n")
+      lib.fileAppend(hptrack.file.capture.simple, log_string .. "\n\n")
     end
   end
 end
@@ -93,6 +93,16 @@ hptrack.parseAction = function(action)
           end
         end
         
+        local add_effect_message = effect.add_effect_message
+        --[[
+        if add_effect_message then
+          add_effect_message = hptrack.add_effect_types[action.category][add_effect_message]
+          if add_effect_message then
+            result[mob_id].dmg = result[mob_id].dmg + (effect.param * add_effect_message[2])
+          end
+        end
+        --]]
+        
         --[[
         result[mob_id] = { msg_type = hptrack.msg_types[1][effect.message]}
         if effect.message ~= 15 then
@@ -112,6 +122,8 @@ hptrack.parseAction = function(action)
             result[action.actor_id].dmg = result[action.actor_id].dmg + effect.spike_effect_param
           end
         end
+        
+        
       end
     end
     return result
@@ -231,15 +243,72 @@ function hptrack.calculateIntervals(mob)
   end
 end
 
+-- Inserts HP data into a database
+---------------------------------------------------------------------
+hptrack.addHPToMobList = function(db, mob)
+  local zone_db = db.zone[hptrack.vars.current_zone]
+  local mob_id = mob.id
+  local mob_name = mob.name:gsub("(['\"\\])", "\\%1")
+  if not zone_db then
+    db.zone[hptrack.vars.current_zone] = {
+      info = {},
+      _meta = {
+        key = hptrack.vars.current_zone,
+        num = 0,
+        loaded_num = 0,
+        parent = true,
+      }
+    }
+    zone_db = db.zone[hptrack.vars.current_zone]
+  end
+
+  local group_db = zone_db.info[mob_name]
+  if not group_db then
+    zone_db.info[mob_name] = {
+      info = {},
+      _meta = {
+        key = mob_name,
+        parent = true,
+        num = 0
+      }
+    }
+    group_db = zone_db.info[mob_name]
+  end
+
+  local mob_db = group_db.info[mob_id]
+  if not mob_db then
+    group_db.info[mob_id] = {
+      info = {},
+      _meta = {
+        key = mob_id,
+        num = 0,
+        parent = true
+      }
+    }
+    mob_db = group_db.info[mob_id]
+  end
+
+  local hp_hash = tostring(mob.min) .. '-'.. tostring(mob.max)
+  if not mob_db.info[hp_hash] then
+    mob_db.info[hp_hash] = {info = mob}
+    zone_db._meta.num = zone_db._meta.num + 1
+    group_db._meta.num = group_db._meta.num + 1
+    mob_db._meta.num = mob_db._meta.num + 1
+    return true
+  end
+  
+  return false
+end
+
 -- Sets up tables and files for use in the current zone
 --------------------------------------------------
 function hptrack.setupZone(zone, zone_left)
   local zone_name = res.zones[zone].en
   
-  hptrack.file.simple = files.new(hptrack.settings.file_path..'simple/'.. zone_name ..'.log', true)
+  hptrack.file.simple = lib.fileOpen(hptrack.settings.file_path..'simple/'.. zone_name ..'.log')
   
   if hptrack.settings.mode == lib.mode.CAPTURE then
-    hptrack.file.capture.simple = files.new(hptrack.vars.capture_root ..'simple/'.. zone_name ..'.log', true)
+    hptrack.file.capture.simple = lib.fileOpen(hptrack.vars.capture_root ..'simple/'.. zone_name ..'.log')
   end
 end
 
@@ -351,18 +420,47 @@ hptrack.initialize = function()
       [318] = {'JA (Recover)', -1},
       [323] = {'JA (No Effect)', 0},
       [324] = {'(Miss) JA', 0},
+      [379] = {'JA (Magic Burst)', 1},
       [539] = {'WS (Recover)', -1},
     },
     [4] = {
       [2] = {'Magic Damage', 1},
       [7] = {'Magic (Recovery)', -1},
-      [227] = {'Magic (Drain)', 1}
+      [227] = {'Magic (Drain)', 1},
+      [252] = {'Magic (Burst)', 1},
+      [262] = {'Magic (Burst)', 1},
+      [274] = {'Magic (Burst Drain)', 1},
+      [648] = {'Meteor', 1},
+      [650] = {'Meteor (Burst)', 1},
+      [651] = {'Meteor (Recover)', -1},
+    }
+  }
+  
+  hptrack.add_effect_types = {
+    [3] = {
+      [288] = {'SC: Light', 1},
+      [289] = {'SC: Darkness', 1},
+      [290] = {'SC: Gravitation', 1},
+      [291] = {'SC: Fragmentation', 1},
+      [292] = {'SC: Distortion', 1},
+      [293] = {'SC: Fusion', 1},
+      [294] = {'SC: Compression', 1},
+      [295] = {'SC: Liquefaction', 1},
+      [296] = {'SC: Induration', 1},
+      [297] = {'SC: Reverberation', 1},
+      [298] = {'SC: Transfixion', 1},
+      [299] = {'SC: Scission', 1},
+      [300] = {'SC: Detonation', 1},
+      [301] = {'SC: Impaction', 1},
+      [302] = {'SC: Cosmic Elucidation', 1},
+      [767] = {'SC: Radiance', 1},
+      [768] = {'SC: Umbra', 1},
     }
   }
 
   hptrack.file = T{}
   hptrack.file.capture = T{}
-  hptrack.file.simple = files.new(hptrack.settings.file_path.. hptrack.vars.my_name ..'/logs/simple.log', true)
+  hptrack.file.simple = lib.fileOpen(hptrack.settings.file_path.. hptrack.vars.my_name ..'/logs/simple.log')
 
   lib.checkLibVer(hptrack)
   windower.register_event("action", function(action)

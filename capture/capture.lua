@@ -106,9 +106,21 @@ capture.startCapture = function()
     file_root = capture.settings.capture_root.. '%.4u-%.2u-%.2u_%.2u-%.2u/%s/'
     file_root = file_root:format(date.year, date.month, date.day, date.hour, date.min, capture.my_name)
     
+    local started_plugins = 0
+    local started_line = ''
     for name, plugin in pairs(capture.plugin) do
       local plugin_path = file_root.. plugin.info.folder
       lib.startCapture(plugin, plugin_path)
+      started_line = started_line .. '('.. plugin.info.log_name .. ' v'.. plugin.info.version .. ') '
+      started_plugins = started_plugins + 1
+      if started_plugins == 3 then
+        lib.msg(capture, started_line)
+        started_line = ''
+        started_plugins = 0
+      end
+    end
+    if started_line ~= '' then
+      lib.msg(capture, started_line)
     end
     
     coroutine.schedule(function()

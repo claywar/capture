@@ -12,8 +12,8 @@ chat = require('chat')
 -------------------------------------------
 
 lib = {}
-lib.version = '004'
-lib.date = '2019/11/10'
+lib.version = '005'
+lib.date = '2019/11/16'
 
 lib.color = {
    [1] = {string.char(0x1F,   1), '\\cs(255, 255, 255)'},
@@ -222,7 +222,7 @@ end
 lib.formatDatabaseEntry = function(info, format, indent)
   if not indent then indent = 0 end
   local format_args = {
-    [1] = tostring(info[format._key.field]),
+    [1] = tostring(info[format._key.field]):gsub("(['\"\\])", "\\%1"),
   }
   format_args[2] = string.rep(' ', format._key.width - #format_args[1])
   for i = 1, format._num do
@@ -277,6 +277,43 @@ lib.writeDatabase = function(addon, db_table, key, file_stream, format)
   string_to_write = string_to_write .. lib.formatDatabaseTable(db_table[key], key, 4, db_table._meta.format)
   string_to_write = string_to_write .. "}\nreturn database"
   file_stream:write(string_to_write)
+end
+
+-- Handles opening, or creating, a file object. Returns it.
+--------------------------------------------------
+lib.fileOpen = function(path)
+  local file = {
+    stream = files.new(path, true),
+    locked = false,
+    scheduled = false,
+    buffer = ''
+  }
+  return file
+end
+
+-- Handles writing to a file (gently)
+--------------------------------------------------
+lib.fileAppend = function(file, text)
+  if not file.locked then
+    file.buffer = file.buffer .. text
+    if not file.scheduled then
+      file.scheduled = true
+      coroutine.schedule(function() lib.fileWrite(file) end, 0.5)
+    end
+  else
+    coroutine.schedule(function() lib.fileAppend(file, text) end, 0.1)
+  end
+end
+
+-- Writes to a file and empties the buffer
+--------------------------------------------------
+lib.fileWrite = function(file)
+  file.locked = true
+  local to_write = file.buffer
+  file.buffer = ''
+  file.scheduled = false
+  file.stream:append(to_write)
+  file.locked = false
 end
 
 -- Recursively steps through a table and moves all tables
@@ -502,7 +539,7 @@ lib.startCapture = function(addon, file_root)
     addon.vars.capture_root = file_root
     
     addon.startCapture()
-    lib.msg(addon, 'Capture started. ('.. addon.info.name ..' v'.. addon.info.version ..')')
+    --lib.msg(addon, 'Capture started. ('.. addon.info.name ..' v'.. addon.info.version ..')')
   else
     lib.msg(addon, 'Capture already in progress!')
   end

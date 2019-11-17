@@ -6,9 +6,9 @@ eventview.info = {
   name = 'EventView',
   log_name = 'EView',
   box_name = 'EView',
-  version = '005',
-  date = '2019/11/11',
-  lib_version = '004',
+  version = '006',
+  date = '2019/11/16',
+  lib_version = '005',
   author = 'ibm2431',
   commands = {'eventview'},
   key = 'eventview',
@@ -122,12 +122,12 @@ eventview.commands = {
 --------------------------------------------------
 eventview.setupZone = function(zone)
   local current_zone = res.zones[zone].en
-  eventview.file.simple = files.new(eventview.settings.file_path.. eventview.vars.my_name ..'/simple/'.. current_zone ..'.log', true)
-  eventview.file.raw = files.new(eventview.settings.file_path.. eventview.vars.my_name ..'/raw/'.. current_zone ..'.log', true)
+  eventview.file.simple = lib.fileOpen(eventview.settings.file_path.. eventview.vars.my_name ..'/simple/'.. current_zone ..'.log')
+  eventview.file.raw = lib.fileOpen(eventview.settings.file_path.. eventview.vars.my_name ..'/raw/'.. current_zone ..'.log')
   
   if eventview.settings.mode == lib.mode.CAPTURE then
-    eventview.file.capture.simple = files.new(eventview.vars.capture_root ..'simple/'.. current_zone ..'.log', true)
-    eventview.file.capture.raw = files.new(eventview.vars.capture_root ..'raw/'.. current_zone ..'.log', true)
+    eventview.file.capture.simple = lib.fileOpen(eventview.vars.capture_root ..'simple/'.. current_zone ..'.log')
+    eventview.file.capture.raw = lib.fileOpen(eventview.vars.capture_root ..'raw/'.. current_zone ..'.log')
   end
 end
 
@@ -284,12 +284,12 @@ eventview.checkChunk = function(dir, id, data)
     
     if eventview.settings.mode >= lib.mode.PASSIVE then
       local simple_string = eventview.buildSimpleString(info)
-      eventview.file.simple:append(simple_string .. "\n\n")
-      eventview.file.raw:append(simple_string .. '\n'.. data:hexformat_file() .. '\n')
+      lib.fileAppend(eventview.file.simple, simple_string .. "\n\n")
+      lib.fileAppend(eventview.file.raw, simple_string .. '\n'.. data:hexformat_file() .. '\n')
       
       if eventview.settings.mode == lib.mode.CAPTURE then
-        eventview.file.capture.simple:append(simple_string .. "\n\n")
-        eventview.file.capture.raw:append(simple_string .. '\n'.. data:hexformat_file() .. '\n')
+        lib.fileAppend(eventview.file.capture.simple, simple_string .. "\n\n")
+        lib.fileAppend(eventview.file.capture.raw, simple_string .. '\n'.. data:hexformat_file() .. '\n')
       end
     end
     
@@ -303,8 +303,8 @@ end
 -- Starts logging to a new log file
 ---------------------------------------------------------------------
 eventview.startCapture = function()
-  eventview.file.capture.simple = files.new(eventview.vars.capture_root.. 'simple.log', true)
-  eventview.file.capture.raw    = files.new(eventview.vars.capture_root.. 'raw.log', true)
+  eventview.file.capture.simple = lib.fileOpen(eventview.vars.capture_root.. 'simple.log')
+  eventview.file.capture.raw    = lib.fileOpen(eventview.vars.capture_root.. 'raw.log')
 end
 
 -- Stops logging to a capture file
@@ -419,8 +419,8 @@ eventview.initialize = function()
 
   eventview.file = T{}
   eventview.file.capture = T{}
-  eventview.file.simple = files.new(eventview.settings.file_path.. eventview.vars.my_name ..'/logs/simple.log', true)
-  eventview.file.raw    = files.new(eventview.settings.file_path.. eventview.vars.my_name ..'/logs/raw.log', true)
+  eventview.file.simple = lib.fileOpen(eventview.settings.file_path.. eventview.vars.my_name ..'/logs/simple.log')
+  eventview.file.raw    = lib.fileOpen(eventview.settings.file_path.. eventview.vars.my_name ..'/logs/raw.log')
 
   ---------------------------------------------------------------------------------
   -- PACKET PARSING INFORMATION
