@@ -6,9 +6,9 @@ actionview.info = {
   name = 'ActionView',
   log_name = 'AView',
   box_name = 'AV',
-  version = '003',
-  date = '2019/11/16',
-  lib_version = '005',
+  version = '004',
+  date = '2020/02/27',
+  lib_version = '006',
   author = 'ibm2431',
   commands = {'actionview','actview','aview'},
   key = 'actionview',
@@ -218,13 +218,27 @@ actionview.parseAction = function(action)
         return res.weapon_skills[action.param].en
       end
     end,
-    [4] = function(action)  return res.spells[action.param].en end,                              -- Casted magic
+    [4] = function(action)                                                                      -- Casted magic
+      local spell = res.spells[action.param]
+      if spell then 
+        return spell.en
+      else
+        return ''
+      end
+    end,
     [5] = function(action)  return res.items[action.param].en end,                               -- Item Usage execution
     [6] = function(action)  return res.job_abilities[action.param].en end,                       -- Most job abilities
     [7] = function(action)  return res.weapon_skills[action.targets[1].actions[1].param].en end, -- TP Move Start "Players: add 768, compare abils.xml. Mobs: -256, mabils.xml"
     [8] = function(action)  return res.spells[action.targets[1].actions[1].param].en end,        -- Spell Start
     [9] = function(action)  return res.items[action.targets[1].actions[1].param].en end,         -- Item Usage initiation
-    [11] = function(action) return res.monster_abilities[action.param].en end,                   -- Mob TP moves
+    [11] = function(action)                                                                      -- Mob TP moves
+      local ability = res.monster_abilities[action.param]
+      if ability then 
+        return ability.en 
+      else
+        return ''
+      end
+    end,
     [12] = function(action) return 'Ranged Attack (Start)' end,                                  -- Ranged Attack initiation
     [13] = function(action) return res.job_abilities[action.param].en end,                       -- Pet TP Moves
     [14] = function(action) return res.job_abilities[action.param].en end,                       -- Non-blinkable job abilities (Jigs, Sambas, Steps, Waltzes, Flourish)
@@ -314,7 +328,6 @@ actionview.addActionToMobList = function(db, result)
   end
 
   local mob_key = result.actor_name ..'-'.. tostring(result.actor)
-  mob_key = mob_key:gsub("(['\"\\])", "\\%1")
   local mob_db = zone_db.info[mob_key]
   if not mob_db then
     zone_db.info[mob_key] = {

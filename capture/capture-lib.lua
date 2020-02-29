@@ -12,8 +12,8 @@ chat = require('chat')
 -------------------------------------------
 
 lib = {}
-lib.version = '005'
-lib.date = '2019/11/16'
+lib.version = '006'
+lib.date = '2020/02/27'
 
 lib.color = {
    [1] = {string.char(0x1F,   1), '\\cs(255, 255, 255)'},
@@ -243,7 +243,7 @@ lib.formatDatabaseTable = function(db, key, indent, format_type)
   if not indent then indent = 0 end
   local db_string = ''
   if type(key) == 'string' then
-    db_string = db_string .. '[\''.. key ..'\'] = {\n'
+    db_string = db_string .. '[\''.. key:gsub("(['\"\\])", "\\%1") ..'\'] = {\n'
   else
     db_string = db_string .. '['.. tostring(key) ..'] = {\n'
   end

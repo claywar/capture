@@ -6,9 +6,9 @@ eventview.info = {
   name = 'EventView',
   log_name = 'EView',
   box_name = 'EView',
-  version = '006',
-  date = '2019/11/16',
-  lib_version = '005',
+  version = '007',
+  date = '2020/02/26',
+  lib_version = '006',
   author = 'ibm2431',
   commands = {'eventview'},
   key = 'eventview',
@@ -137,13 +137,13 @@ eventview.getParams = function(params_string)
   local params = {}
   local final_param_string = ''
   local int_rep = 0
-  for i=0, 6 do
-    params[i + 1] = string.sub(params_string, (i*8)+1, (i*8) + 8)
+  for i = 0, 6 do
+    params[i + 1] = string.sub(params_string, (i * 8)+1, (i * 8) + 8)
     int_rep = lib.byteStringToInt(params[i + 1])
     params[i + 1] = tostring(int_rep)
     final_param_string = final_param_string .. int_rep .. ", "
   end
-  params[8] = string.sub(params_string, (7*8)+1, (7*8) + 8)
+  params[8] = string.sub(params_string, (7 * 8) + 1, (7 * 8) + 8)
   int_rep = lib.byteStringToInt(params[8])
   params[8] = tostring(int_rep)
   final_param_string = final_param_string .. int_rep
@@ -178,7 +178,7 @@ eventview.writeBox = function(info)
     
     if template == eventview.template.OPTION then
       box.option = eventview.color.box.OPTION.. lib.padLeft(info.option, 5)
-    elseif template ~= eventview.template.EVENT then
+    elseif info.params then
       box.p1 = lib.padLeft(info.params[1], 11)
       box.p2 = lib.padLeft(info.params[2], 11)
       box.p3 = lib.padLeft(info.params[3], 11)
@@ -249,7 +249,13 @@ eventview.checkChunk = function(dir, id, data)
       update_packet = packets.parse('incoming', data)
     end
     
-    if update_packet['NPC'] then
+    if id == 0x00A and not (update_packet['Menu Zone'] > 0) then
+      return
+    end
+    
+    if update_packet['Menu Zone'] then
+      info.actor = update_packet['Menu Zone']
+    elseif update_packet['NPC'] then
       info.actor = update_packet['NPC']
     elseif update_packet['Actor'] then
       info.actor = update_packet['Actor']
@@ -258,9 +264,13 @@ eventview.checkChunk = function(dir, id, data)
     end
     
     if info.actor then
-      local mob = windower.ffxi.get_mob_by_id(info.actor)
-      if mob and mob.name then
-        info.actor = info.actor .. ' ('.. mob.name ..')'
+      if id == 0x00A then
+        info.actor = info.actor .. ' ('.. res.zones[info.actor].en ..')'
+      else
+        local mob = windower.ffxi.get_mob_by_id(info.actor)
+        if mob and mob.name then
+          info.actor = info.actor .. ' ('.. mob.name ..')'
+        end
       end
     end
 
@@ -273,10 +283,11 @@ eventview.checkChunk = function(dir, id, data)
     else
       eventview.vars.in_event = true
       
-      
       if update_packet['Menu ID'] then
         info.event = string.format('%X', tonumber(update_packet['Menu ID'], 16))
-        info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x08*2)+1, (0x24*2)))
+        if (not update_packet['Menu Zone']) or (update_packet['Menu Zone'] <= 0) then
+          info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x08*2)+1, (0x24*2)))
+        end
       elseif id ~= 0x032 then
         info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x04*2)+1, (0x20*2)))
       end
@@ -364,6 +375,7 @@ eventview.initialize = function()
     option  = eventview.color.log.SYSTEM .. 'Option: ' .. eventview.color.log.OPTION,
     message = eventview.color.log.SYSTEM .. 'Message: '.. eventview.color.log.MESSAGE,
     params  = eventview.color.log.SYSTEM .. 'Params: ' .. eventview.color.log.PARAMS,
+    zone    = eventview.color.log.SYSTEM .. 'Zone: '   .. eventview.color.log.ACTOR,
   }
 
   ---------------------------------------------------------------------------------
@@ -374,6 +386,9 @@ eventview.initialize = function()
   eventview.template.EVENT        = ' ${dir|%s} ${type|%s}'.. 
                                  eventview.color.box.SYSTEM ..'[ID View]\n Event: ${event|%s}'.. eventview.color.box.SYSTEM ..
                                  ' Actor: ${actor|%s}\n \n '
+  eventview.template.ZONE        = ' ${dir|%s} ${type|%s}'.. 
+                                 eventview.color.box.SYSTEM ..'[ID View]\n Event: ${event|%s}'.. eventview.color.box.SYSTEM ..
+                                 ' Zone: ${actor|%s}\n \n '
   eventview.template.EVENT_PARAMS = ' ${dir|%s} ${type|%s}'.. 
                                  eventview.color.box.SYSTEM ..'[ID View]\n Event: ${event|%s}'.. eventview.color.box.SYSTEM ..
                                  ' Actor: ${actor|%s}\n '..eventview.color.box.SYSTEM ..'P: '.. eventview.color.box.PARAMS ..
@@ -427,6 +442,16 @@ eventview.initialize = function()
   ---------------------------------------------------------------------------------
 
   eventview.packets = {
+    [0x00A] = {
+      dir = 'INCOMING <',
+      text = 'Zone CS (0x00A): ',
+      box_color = eventview.color.box.EVENT_HEADER,
+      log_color = eventview.color.log.EVENT_HEADER,
+      log_string = eventview.h.zone..'%s, '.. eventview.h.event..'%s\n',
+      simple_string = ' Zone: %s\nEvent: %s',
+      string_params = function(info) return {[1] = info.actor, [2] = info.event} end,
+      template = eventview.template.ZONE,
+    },
     [0x032] = {
       dir = 'INCOMING <',
       text = 'CS Event (0x032): ',
