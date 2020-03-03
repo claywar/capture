@@ -5,7 +5,7 @@ capture.info = {
   name = 'Capture',
   log_name = 'Capture',
   box_name = 'Capture',
-  version = '001',
+  version = '002',
   date = '2020/03/02',
   lib_version = '006',
   author = 'ibm2431',
@@ -198,6 +198,12 @@ windower.register_event('unload',function (command, ...)
   if capture.settings.mode == lib.mode.CAPTURE then
     capture.stopCapture()
   end
+  for name, plugin in pairs(capture.plugin) do
+    if plugin.unload then
+      plugin.unload()
+    end
+  end
+    
 	windower.send_command('unbind ^c')
   windower.send_command('unbind ^v')
 end)

@@ -6,7 +6,7 @@ info.info = {
   name = 'Info',
   log_name = 'Info',
   box_name = 'Info',
-  version = '002',
+  version = '003',
   date = '2020/03/02',
   lib_version = '006',
   author = 'ibm2431',
@@ -420,6 +420,28 @@ info.preRender = function()
         info.vars.world.box.capture_time = capture_time
       end
     end
+  end
+end
+
+-- The unload event to run when capture unloads
+--------------------------------------------------
+info.unload = function()
+  local addon_settings = info.settings
+  local char_x, char_y = texts.pos(info.vars.char.box)
+  local target_x, target_y = texts.pos(info.vars.target.box)
+  local world_x, world_y = texts.pos(info.vars.world.box)
+  addon_settings.char_box.pos.x = char_x
+  addon_settings.char_box.pos.y = char_y
+  addon_settings.target_box.pos.x = target_x
+  addon_settings.target_box.pos.y = target_y
+  addon_settings.world_box.pos.x = world_x
+  addon_settings.world_box.pos.y = world_y
+
+  if capture then
+    capture.settings[info.info.key] = addon_settings
+    config.save(capture.settings)
+  else
+    config.save(addon_settings)
   end
 end
 
