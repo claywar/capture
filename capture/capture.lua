@@ -5,8 +5,8 @@ capture.info = {
   name = 'Capture',
   log_name = 'Capture',
   box_name = 'Capture',
-  version = '000',
-  date = '2019/11/11',
+  version = '001',
+  date = '2020/03/02',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'capture'},
@@ -27,6 +27,7 @@ capture.plugin = {
   eventview = require('eventview'),
   caplog = require('caplog'),
   hptrack = require('hptrack'),
+  info = require('info'),
 }
 
 capture.plugin_alias = {
@@ -43,7 +44,8 @@ capture.plugin_alias = {
   cl = 'caplog',
   capturelog = 'caplog',
   hptrack = 'hptrack',
-  hpt = 'hptrack'
+  hpt = 'hptrack',
+  info = 'info',
 }
 
 -- ------------------------------------------------------------------------------
@@ -62,6 +64,7 @@ capture.defaults.color.system    = 19
 
 capture.settings = config.load(capture.defaults)
 
+
 for name, plugin in pairs(capture.plugin) do
   plugin.settings = capture.settings[name]
 end
@@ -78,8 +81,28 @@ capture.color.box = { -- \\cs(#,#,#) values for Windower text boxes
   SYSTEM       = lib.color[capture.settings.color.system][2],
 }
 
+local has_prerenders = false
+capture.prerenders = {}
 for name, plugin in pairs(capture.plugin) do
   plugin.initialize()
+  if plugin.preRender then
+    capture.prerenders[name] = plugin.preRender
+    has_prerenders = true
+  end
+end
+
+if has_prerenders then
+  capture.frame = 0
+  windower.register_event('prerender', function()
+    if capture.frame % 5 == 0 then
+      for name, prerender in pairs(capture.prerenders) do
+        prerender()
+      end
+      capture.frame = 0
+    end
+    capture.frame = capture.frame + 1
+  end)
+  capture.frame = 0
 end
 
 windower.register_event('addon command',function (command, ...)
@@ -96,6 +119,15 @@ windower.register_event('addon command',function (command, ...)
       warning('Unknown plugin: \''..command..'\'. Ignored.')
     end
 	end
+end)
+
+windower.register_event('unhandled command',function (command, ...)
+	command = command and command:lower()
+  for alias, full_name in pairs(capture.plugin_alias) do
+    if command == alias then
+      capture.plugin[alias].command(...)
+    end
+  end
 end)
 
 -- Starts a capture
@@ -144,7 +176,6 @@ end
 capture.stopCapture = function()
   if capture.mode == lib.mode.CAPTURE then
     for name, plugin in pairs(capture.plugin) do
-      local plugin_path = file_root.. plugin.info.folder
       lib.stopCapture(plugin, true)
     end
 

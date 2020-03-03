@@ -6,9 +6,9 @@ npcl.info = {
   name = 'NPCLogger',
   log_name = 'NPCL',
   box_name = 'NPCL',
-  version = '000',
-  date = '2019/11/16',
-  lib_version = '005',
+  version = '001',
+  date = '2020/03/02',
+  lib_version = '006',
   author = 'ibm2431',
   commands = {'npclogger', 'npcl'},
   key = 'npcl',
@@ -41,7 +41,7 @@ npcl.defaults.widescan_verbosity = 1 -- bitmask of what widescan-related message
 npcl.defaults.message_color = 7
 npcl.defaults.remind_widescan = true -- npcl.displays a message a short time after a zone to remind to WS
 npcl.defaults.auto_ws_mode = 1 -- 1: When seeing mob we lack WS for, 2: Auto-timed (30s)
-npcl.defaults.show_bar = true -- shows the NPCL info bar
+npcl.defaults.show_bar = false -- shows the NPCL info bar
 
 npcl.defaults.debug_box = T{}
 npcl.defaults.debug_box.pos   = T{}
@@ -383,13 +383,12 @@ npcl.commands = {
   ['help'] = function()
     lib.displayHelp(npcl)
   end,
-  ['info'] = function()
+  ['info'] = function(args)
+    lib.setToggle(npcl, 'show_bar', args[1])
     if npcl.settings.show_bar then
-      npcl.settings.show_bar = false
-      npcl.vars.debug.box:hide()
-    else
-      npcl.settings.show_bar = true
       npcl.vars.debug.box:show()
+    else
+      npcl.vars.debug.box:hide()
     end
   end,
   ['mode'] = function(args)
@@ -1151,6 +1150,49 @@ npcl.checkChunk = function(id, data, modified, injected, blocked)
   end
 end
 
+-- The prerender event to run when capture calls a prerender
+--------------------------------------------------
+npcl.preRender = function()
+  if npcl.settings.show_bar then
+    if npcl.vars.debug.save_time > 0 then
+      npcl.vars.debug.box.save_time = lib.padRight(tostring(((npcl.vars.debug.save_time - os.clock()) % 60):floor()), 2)
+    end
+    if npcl.vars.debug.ws_time > 0 then
+      npcl.vars.debug.box.ws_time = lib.padRight(tostring(((npcl.vars.debug.ws_time - os.clock()) % 60):floor()), 2)
+    end
+    if npcl.vars.debug.ws_auto > 0 then
+      npcl.vars.debug.box.ws_auto = lib.padRight(tostring(((npcl.vars.debug.ws_auto - os.clock()) % 60):floor()), 2)
+    end
+    
+    if not info then
+      local mob = windower.ffxi.get_mob_by_target('t')
+      if mob and mob.id > 0 then
+        local npc = nil
+        if npcl.settings.mode == lib.mode.CAPTURE then
+          npc = npcl.db.capture.npc_info[mob.id]
+        else
+          npc = npcl.db.main.npc_info[mob.id]
+        end
+
+        npcl.vars.debug.box.npc_id = '\\cs(100,255,100)'.. mob.id ..'\\cr'
+        if npc and npc.widescan and npc.widescan.seen then
+          npcl.vars.debug.box.npc_level = '\\cs(100,255,100)'.. lib.padRight(tostring(npc.widescan.seen), 3) ..'\\cr'
+        else
+          --if npc.widescan.checked then
+            --npcl.vars.debug.box.npc_level = '\\cs(100,255,100)X  \\cr' -- Only use this if we know we checked when the mob was up!
+          --else
+            npcl.vars.debug.box.npc_level = '\\cs(255,100,100)?  \\cr'
+          --end
+        end
+      else
+        --npcl.vars.debug.box.npc_id = ' -None- '
+        npcl.vars.debug.box.npc_id =' -None- '
+        npcl.vars.debug.box.npc_level = '-  '
+      end
+    end
+  end
+end
+
 -- Starts a capture
 ---------------------------------------------------------------------
 npcl.startCapture = function()
@@ -1230,10 +1272,19 @@ npcl.initialize = function()
     settings = npcl.settings.debug_box
   }
 
-  if (npcl.settings.auto_ws_mode == 2) then
-    box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d}s AutoWS: ${ws_auto|%2d} WSCool: ${ws_time|%2d}'
+  local box_text
+  if info then
+    if (npcl.settings.auto_ws_mode == 2) then
+      box_text = '[NPCL] Save: ${save_time|%2d}s AutoWS: ${ws_auto|%2d} WSCool: ${ws_time|%2d}'
+    else
+      box_text = '[NPCL] Save: ${save_time|%2d} WS: ${ws_time|%2d}'
+    end
   else
-    box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d} WS: ${ws_time|%2d}'
+    if (npcl.settings.auto_ws_mode == 2) then
+      box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d}s AutoWS: ${ws_auto|%2d} WSCool: ${ws_time|%2d}'
+    else
+      box_text = '[NPCL] Mob: ${npc_id|%s} Level: ${npc_level|%s} Save: ${save_time|%2d} WS: ${ws_time|%2d}'
+    end
   end
   npcl.vars.debug.box = texts.new(box_text, npcl.vars.debug.settings)
   npcl.vars.debug.box.save_time = '0 '
@@ -1299,54 +1350,22 @@ npcl.initialize = function()
   ---------------------------------------------------------------------------------
   if not capture then
     windower.register_event('addon command', npcl.command)
+
+    windower.register_event('prerender', function()
+      if frame%10 == 0 then
+        npcl.prerender()
+        frame = 0
+      end
+      frame = frame + 1
+    end)
+
+    frame = 0
   end
   
   windower.register_event('zone change', function(new, old)
     npcl.setupZone(new, old)
   end)
 
-  windower.register_event('prerender', function()
-    if frame%10 == 0 then
-      if npcl.vars.debug.save_time > 0 then
-        npcl.vars.debug.box.save_time = lib.padRight(tostring(((npcl.vars.debug.save_time - os.clock()) % 60):floor()), 2)
-      end
-      if npcl.vars.debug.ws_time > 0 then
-        npcl.vars.debug.box.ws_time = lib.padRight(tostring(((npcl.vars.debug.ws_time - os.clock()) % 60):floor()), 2)
-      end
-      if npcl.vars.debug.ws_auto > 0 then
-        npcl.vars.debug.box.ws_auto = lib.padRight(tostring(((npcl.vars.debug.ws_auto - os.clock()) % 60):floor()), 2)
-      end
-      
-      local mob = windower.ffxi.get_mob_by_target('t')
-      if mob and mob.id > 0 then
-        local npc = nil
-        if npcl.settings.mode == lib.mode.CAPTURE then
-          npc = npcl.db.capture.npc_info[mob.id]
-        else
-          npc = npcl.db.main.npc_info[mob.id]
-        end
-
-        npcl.vars.debug.box.npc_id = '\\cs(100,255,100)'.. mob.id ..'\\cr'
-        if npc and npc.widescan and npc.widescan.seen then
-          npcl.vars.debug.box.npc_level = '\\cs(100,255,100)'.. lib.padRight(tostring(npc.widescan.seen), 3) ..'\\cr'
-        else
-          --if npc.widescan.checked then
-            --npcl.vars.debug.box.npc_level = '\\cs(100,255,100)X  \\cr' -- Only use this if we know we checked when the mob was up!
-          --else
-            npcl.vars.debug.box.npc_level = '\\cs(255,100,100)?  \\cr'
-          --end
-        end
-      else
-        --npcl.vars.debug.box.npc_id = ' -None- '
-        npcl.vars.debug.box.npc_id =' -None- '
-        npcl.vars.debug.box.npc_level = '-  '
-      end
-      frame = 0
-    end
-    frame = frame + 1
-  end)
-
-  frame = 0
   npcl.setupZone(windower.ffxi.get_info().zone)
   windower.register_event('incoming chunk', npcl.checkChunk)
 end
