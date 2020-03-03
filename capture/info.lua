@@ -497,7 +497,7 @@ info.initialize = function()
     
     windower.register_event('prerender', function()
       if frame%10 == 0 then
-        info.prerender()
+        info.preRender()
         frame = 0
       end
       frame = frame + 1

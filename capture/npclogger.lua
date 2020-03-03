@@ -1353,7 +1353,7 @@ npcl.initialize = function()
 
     windower.register_event('prerender', function()
       if frame%10 == 0 then
-        npcl.prerender()
+        npcl.preRender()
         frame = 0
       end
       frame = frame + 1
