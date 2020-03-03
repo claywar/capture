@@ -6,7 +6,7 @@ info.info = {
   name = 'Info',
   log_name = 'Info',
   box_name = 'Info',
-  version = '001',
+  version = '002',
   date = '2020/03/02',
   lib_version = '006',
   author = 'ibm2431',
@@ -141,6 +141,14 @@ info.commands = {
       info.vars.target.box:hide()
     end
   end,
+  ['target_style'] = function(args)
+    if info.settings.target_box.style == "horizontal" then
+      info.settings.target_box.style = "vertical"
+    else
+      info.settings.target_box.style = "horizontal"
+    end
+    info.buildTargetBox()
+  end,
   ['world'] = function(args)
     lib.setToggle(info, 'show_world', args[1])
     if info.settings.show_world then
@@ -163,6 +171,21 @@ info.commands = {
   end,
   ['mode'] = function(args)
     lib.setMode(info, args[1])
+    if (info.settings.mode == lib.mode.OFF) or (info.settings.mode == lib.mode.PASSIVE) then
+      info.vars.char.box:hide()
+      info.vars.target.box:hide()
+      info.vars.world.box:hide()
+    else
+      if info.settings.show_char then
+        info.vars.char.box:show()
+      end
+      if info.settings.show_target then
+        info.vars.target.box:show()
+      end
+      if info.settings.show_world then
+        info.vars.world.box:show()
+      end
+    end
   end,  
   ['ver'] = function()
     lib.displayVer(info)
@@ -218,19 +241,40 @@ info.buildCharBox = function()
   end
 end
 
--- Builds the string for target information
+-- Builds the targe information box
 --------------------------------------------------
-info.buildTargetString = function()
+info.buildTargetBox = function()
+  if info.vars.target then
+    info.vars.target.box:hide()
+    info.vars.target = nil
+  end
+  
   local box_text = ''
   if info.settings.target_box.style == "horizontal" then
     box_text = 'ID: ${id|%s} Lv: ${lvl|%s} X: ${mx|%s} Y: ${my|%s} Z: ${mz|%s} R: ${mr|%s}'
   else
     box_text = 'ID: ${id|%s}\nLv: ${lvl|%s}\nX : ${mx|%s}\nY : ${my|%s}\nZ : ${mz|%s}\nR : ${mr|%s}'
   end
-  return box_text
+
+  info.vars.target = {
+    box = texts.new(),
+    settings = info.settings.target_box
+  }
+
+  info.vars.target.box = texts.new(box_text, info.vars.target.settings)
+  info.vars.target.box.id  = ' -None- '
+  info.vars.target.box.lvl = '  ?'
+  info.vars.target.box.mx  = '  ?     '
+  info.vars.target.box.my  = '  ?     '
+  info.vars.target.box.mz  = '  ?     '
+  info.vars.target.box.mr  = ' ?'
+  
+  if info.settings.show_target and (not info.settings.target_box.auto_hide) then
+    info.vars.target.box:show()
+  end
 end
 
--- Builds the string for world information
+-- Builds the world information box
 --------------------------------------------------
 info.buildWorldBox = function()
   if info.vars.world then
@@ -293,86 +337,88 @@ end
 -- The prerender event to run when capture calls a prerender
 --------------------------------------------------
 info.preRender = function()
-  if info.settings.show_char then
-    local my = windower.ffxi.get_mob_by_id(info.vars.my_id)
-    if my then
-      info.vars.char.box.cx = string.format('%+08.03f', my.x)
-      info.vars.char.box.cy = string.format('%+08.03f', my.z) -- Windower and DSP have these axis swapped vs each other
-      info.vars.char.box.cz = string.format('%+08.03f', my.y)
-      local my_facing = my.facing
-      if my_facing < 0 then
-        my_facing = info.vars.twopi - (my_facing * -1)
+  if (info.settings.mode > lib.mode.OFF) and (info.settings.mode ~= lib.mode.PASSIVE) then
+    if info.settings.show_char then
+      local my = windower.ffxi.get_mob_by_id(info.vars.my_id)
+      if my then
+        info.vars.char.box.cx = string.format('%+08.03f', my.x)
+        info.vars.char.box.cy = string.format('%+08.03f', my.z) -- Windower and DSP have these axis swapped vs each other
+        info.vars.char.box.cz = string.format('%+08.03f', my.y)
+        local my_facing = my.facing
+        if my_facing < 0 then
+          my_facing = info.vars.twopi - (my_facing * -1)
+        end
+        local my_r = math.round((my_facing / info.vars.twopi) * 256)
+        info.vars.char.box.cr = string.format('%03d', my_r)
       end
-      local my_r = math.round((my_facing / info.vars.twopi) * 256)
-      info.vars.char.box.cr = string.format('%03d', my_r)
     end
-  end
-  
-  if info.settings.show_target then
-    local mob = windower.ffxi.get_mob_by_target('t')
-    if mob and mob.id > 0 then
-      local level = '\\cs(255,100,100)  ?\\cr'
-      if npcl then
-        local npc = nil
-        if npcl.settings.mode == lib.mode.CAPTURE then
-          npc = npcl.db.capture.npc_info[mob.id]
-        else
-          npc = npcl.db.main.npc_info[mob.id]
+    
+    if info.settings.show_target then
+      local mob = windower.ffxi.get_mob_by_target('t')
+      if mob and mob.id > 0 then
+        local level = '\\cs(255,100,100)  ?\\cr'
+        if npcl then
+          local npc = nil
+          if npcl.settings.mode == lib.mode.CAPTURE then
+            npc = npcl.db.capture.npc_info[mob.id]
+          else
+            npc = npcl.db.main.npc_info[mob.id]
+          end
+          
+          if npc and npc.widescan and npc.widescan.seen then
+            level = '\\cs(100,255,100)'.. lib.padLeft(tostring(npc.widescan.seen), 3) ..'\\cr'
+          end
         end
         
-        if npc and npc.widescan and npc.widescan.seen then
-          level = '\\cs(100,255,100)'.. lib.padLeft(tostring(npc.widescan.seen), 3) ..'\\cr'
+        info.vars.target.box.id   = lib.padLeft(string.format('%8d', mob.id), 8)
+        info.vars.target.box.lvl  = level
+        info.vars.target.box.mx   = string.format('%+08.03f', mob.x)
+        info.vars.target.box.my   = string.format('%+08.03f', mob.z) -- Windower and DSP have these axis swapped vs each other
+        info.vars.target.box.mz   = string.format('%+08.03f', mob.y)
+        
+        local mob_facing = mob.facing
+        if mob_facing < 0 then
+          mob_facing = info.vars.twopi - (mob_facing * -1)
+        end
+        local mob_r = math.round((mob_facing / info.vars.twopi) * 256)
+        if info.settings.target_box.style == "horizontal" then
+          info.vars.target.box.mr = lib.padLeft(string.format('%03d', mob_r), 3)
+        else
+          info.vars.target.box.mr = lib.padLeft(string.format('%03d', mob_r), 4)
+        end
+        
+        info.vars.target.box:show()
+      else
+        info.vars.target.box.id  = ' -None- '
+        info.vars.target.box.lvl = '  ?'
+        info.vars.target.box.mx  = '  ?     '
+        info.vars.target.box.my  = '  ?     '
+        info.vars.target.box.mz  = '  ?     '
+        info.vars.target.box.mr  = '  ?'
+        if info.settings.target_box.auto_hide then
+          info.vars.target.box:hide()
         end
       end
-      
-      info.vars.target.box.id   = lib.padLeft(string.format('%8d', mob.id), 8)
-      info.vars.target.box.lvl  = level
-      info.vars.target.box.mx   = string.format('%+08.03f', mob.x)
-      info.vars.target.box.my   = string.format('%+08.03f', mob.z) -- Windower and DSP have these axis swapped vs each other
-      info.vars.target.box.mz   = string.format('%+08.03f', mob.y)
-      
-      local mob_facing = mob.facing
-      if mob_facing < 0 then
-        mob_facing = info.vars.twopi - (mob_facing * -1)
-      end
-      local mob_r = math.round((mob_facing / info.vars.twopi) * 256)
-      if info.settings.target_box.style == "horizontal" then
-        info.vars.target.box.mr = lib.padLeft(string.format('%03d', mob_r), 3)
-      else
-        info.vars.target.box.mr = lib.padLeft(string.format('%03d', mob_r), 4)
-      end
-      
-      info.vars.target.box:show()
-    else
-      info.vars.target.box.id  = ' -None- '
-      info.vars.target.box.lvl = '  ?'
-      info.vars.target.box.mx  = '  ?     '
-      info.vars.target.box.my  = '  ?     '
-      info.vars.target.box.mz  = '  ?     '
-      info.vars.target.box.mr  = '  ?'
-      if info.settings.target_box.auto_hide then
-        info.vars.target.box:hide()
-      end
-    end
-  end
-  
-  if info.settings.show_world then
-    local timestamp = os.date('%H:%M:%S ')
-    info.vars.world.box.time = timestamp
-    
-    if info.settings.show_moon then
-      local world_info = windower.ffxi.get_info()
-      local moon = world_info.moon
-      local phase = info.vars.moon_phases[world_info.moon_phase]
-      info.vars.world.box.moon = moon ..'% ('.. phase ..')'
     end
     
-    if info.settings.mode == lib.mode.CAPTURE then
-      local time_elapsed = os.time() - info.vars.capture_start
-      local minutes = time_elapsed / 60
-      local hours = minutes / 60
-      local capture_time = string.format('%02d:%02d:%02d', hours, minutes % 60, time_elapsed % 60)
-      info.vars.world.box.capture_time = capture_time
+    if info.settings.show_world then
+      local timestamp = os.date('%H:%M:%S ')
+      info.vars.world.box.time = timestamp
+      
+      if info.settings.show_moon then
+        local world_info = windower.ffxi.get_info()
+        local moon = world_info.moon
+        local phase = info.vars.moon_phases[world_info.moon_phase]
+        info.vars.world.box.moon = moon ..'% ('.. phase ..')'
+      end
+      
+      if info.settings.mode == lib.mode.CAPTURE then
+        local time_elapsed = os.time() - info.vars.capture_start
+        local minutes = time_elapsed / 60
+        local hours = minutes / 60
+        local capture_time = string.format('%02d:%02d:%02d', hours, minutes % 60, time_elapsed % 60)
+        info.vars.world.box.capture_time = capture_time
+      end
     end
   end
 end
@@ -418,25 +464,7 @@ info.initialize = function()
   }
 
   info.buildCharBox()
-
-  info.vars.target = {
-    box = texts.new(),
-    settings = info.settings.target_box
-  }
-
-  info.vars.target.box = texts.new(info.buildTargetString(), info.vars.target.settings)
-  info.vars.target.box.id  = ' -None- '
-  info.vars.target.box.lvl = '  ?'
-  info.vars.target.box.mx  = '  ?     '
-  info.vars.target.box.my  = '  ?     '
-  info.vars.target.box.mz  = '  ?     '
-  info.vars.target.box.mr  = ' ?'
-  
-
-  if info.settings.show_target and (not info.settings.target_box.auto_hide) then
-    info.vars.target.box:show()
-  end
-  
+  info.buildTargetBox()
   info.buildWorldBox()
 
   ---------------------------------------------------------------------------------
