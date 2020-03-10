@@ -6,8 +6,8 @@ actionview.info = {
   name = 'ActionView',
   log_name = 'AView',
   box_name = 'AV',
-  version = '004',
-  date = '2020/02/27',
+  version = '005',
+  date = '2020/03/09',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'actionview','actview','aview'},
@@ -212,7 +212,9 @@ actionview.parseAction = function(action)
     [2] = function(action)  return 'Ranged Attack' end,                                          -- Ranged Attack execution
     [3] = function(action)                                                                       -- WS or some damaging JAs
       local message = action.targets[1].actions[1].message
-      if message == 317 or message == 324 then
+      if action.param >= 257 then
+        return res.monster_abilities[action.param].en
+      elseif message == 317 or message == 324 then
         return res.job_abilities[action.param].en
       else
         return res.weapon_skills[action.param].en
@@ -227,7 +229,13 @@ actionview.parseAction = function(action)
       end
     end,
     [5] = function(action)  return res.items[action.param].en end,                               -- Item Usage execution
-    [6] = function(action)  return res.job_abilities[action.param].en end,                       -- Most job abilities
+    [6] = function(action)                                                                       -- Most job abilities; can include monster abilities
+      if actionview.isMob(action.actor_id) then
+        return res.monster_abilities[action.param].en
+      else
+        return res.job_abilities[action.param].en
+      end
+    end,
     [7] = function(action)  return res.weapon_skills[action.targets[1].actions[1].param].en end, -- TP Move Start "Players: add 768, compare abils.xml. Mobs: -256, mabils.xml"
     [8] = function(action)  return res.spells[action.targets[1].actions[1].param].en end,        -- Spell Start
     [9] = function(action)  return res.items[action.targets[1].actions[1].param].en end,         -- Item Usage initiation
