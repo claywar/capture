@@ -6,8 +6,8 @@ eventview.info = {
   name = 'EventView',
   log_name = 'EView',
   box_name = 'EView',
-  version = '007',
-  date = '2020/02/26',
+  version = '008',
+  date = '2020/03/13',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'eventview'},
@@ -286,10 +286,10 @@ eventview.checkChunk = function(dir, id, data)
       if update_packet['Menu ID'] then
         info.event = string.format('%X', tonumber(update_packet['Menu ID'], 16))
         if (not update_packet['Menu Zone']) or (update_packet['Menu Zone'] <= 0) then
-          info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x08*2)+1, (0x24*2)))
+          info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x08*2)+1, (0x28*2)))
         end
       elseif id ~= 0x032 then
-        info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x04*2)+1, (0x20*2)))
+        info.params, info.param_string = eventview.getParams(string.sub(data:hex(), (0x04*2)+1, (0x24*2)))
       end
     end
     
