@@ -6,8 +6,8 @@ info.info = {
   name = 'Info',
   log_name = 'Info',
   box_name = 'Info',
-  version = '003',
-  date = '2020/03/02',
+  version = '004',
+  date = '2020/04/01',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'info'},
@@ -330,7 +330,12 @@ end
 -- Sets up information for current job
 --------------------------------------------------
 info.setupJob = function(main, mlvl, sub, slvl)
-  info.vars.job = string.format('%02d', mlvl) .. res.jobs[main].ens .. '/'.. string.format('%02d', slvl) .. res.jobs[sub].ens
+  if sub then
+    sub = string.format('%02d', slvl) .. res.jobs[sub].ens
+  else
+    sub = "00NON"
+  end
+  info.vars.job = string.format('%02d', mlvl) .. res.jobs[main].ens .. '/'.. sub
   info.vars.char.box.job = info.vars.job
 end
 
