@@ -6,8 +6,8 @@ actionview.info = {
   name = 'ActionView',
   log_name = 'AView',
   box_name = 'AV',
-  version = '005',
-  date = '2020/03/09',
+  version = '006',
+  date = '2020/05/16',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'actionview','actview','aview'},
@@ -172,8 +172,8 @@ end
 -- Builds a simple string for file logging
 --------------------------------------------------
 actionview.buildSimpleString = function(info)
-  local simple_info = '[Actor: %s] %s > Cat: %s ID: %s Anim: %s Msg: %s'
-  return string.format(simple_info, info.actor, info.name, info.category, info.id, info.animation, info.message)
+  local simple_info = '[Actor: %s (%s)] %s > Cat: %s ID: %s Anim: %s Msg: %s'
+  return string.format(simple_info, info.actor, info.actor_name, info.name, info.category, info.id, info.animation, info.message)
 end
 
 -- Checks if a mob ID belongs to a "mob" based on the current zone
