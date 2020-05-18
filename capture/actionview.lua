@@ -6,8 +6,8 @@ actionview.info = {
   name = 'ActionView',
   log_name = 'AView',
   box_name = 'AV',
-  version = '006',
-  date = '2020/05/16',
+  version = '007',
+  date = '2020/05/18',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'actionview','actview','aview'},
@@ -188,7 +188,7 @@ actionview.checkAction = function(action)
   if actionview.settings.mode > lib.mode.OFF and actionview.settings.category[action.category] then
     if (not actionview.settings.mobs_only) or actionview.isMob(action.actor_id) then
       local result, str_info = actionview.parseAction(action)
-      if result then
+      if result and (result.message ~= 84) then
         if actionview.settings.mode ~= lib.mode.PASSIVE then
           lib.updateBox(actionview, str_info)
           lib.msg(actionview, actionview.buildChatlogString(str_info))
