@@ -631,6 +631,7 @@ fields = {
 --------------------------------------------------
 priceLog.setup_zone = function(zone)
 	local current_zone = res.zones[zone].en
+  my_zone = current_zone
 	findPrice.simple = file.new('data/'.. my_name ..'/simple/'.. current_zone ..'.log', true)
 	findPrice.raw = file.new('data/'.. my_name ..'/raw/'.. current_zone ..'.log', true)
 	priceLog.write_full_table()
