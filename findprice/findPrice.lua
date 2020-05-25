@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _addon.name    = 'findPrice'
 _addon.author  = 'Zohno (findAll), ibm2431 (price mod)'
-_addon.version = '1.20200519'
+_addon.version = '1.20200524'
 _addon.commands = {'findall'}
 
 require('chat')
@@ -273,7 +273,7 @@ function search(query, export)
 
     for id,_ in pairs(new_item_ids) do
         local item = res.items[tonumber(id)]
-	    if item then
+      if item then
             item_names[id] = {
                 ['name'] = item.name,
                 ['long_name'] = item.name_log
@@ -283,7 +283,7 @@ function search(query, export)
 
     for id,_ in pairs(new_key_item_ids) do
         local key_item = res.key_items[tonumber(id)]
-	    if key_item then
+      if key_item then
             key_item_names[id] = {
                 ['name'] = key_item.name,
                 ['long_name'] = key_item.name
@@ -489,11 +489,11 @@ function get_local_storage()
 
         for _, data in ipairs(items[storage_name]) do
             if type(data) == 'table' then
-				if data.id ~= 0 then
-					local id = tostring(data.id)
-					storages[storage_name][id] = (storages[storage_name][id] or 0) + data.count
-				end
-			end
+        if data.id ~= 0 then
+          local id = tostring(data.id)
+          storages[storage_name][id] = (storages[storage_name][id] or 0) + data.count
+        end
+      end
         end
     end
 
@@ -553,7 +553,7 @@ function update()
     if zone_search == false then
         notice('findPrice has not detected a fully loaded inventory yet.')
         return false
-	end
+  end
 
     local player_name   = windower.ffxi.get_player().name
     local self_storage  = file.new(storages_path..'\\'..player_name..'.lua')
@@ -562,13 +562,13 @@ function update()
         self_storage:create()
     end
     
-	local local_storage = get_local_storage()
+  local local_storage = get_local_storage()
 
-	if local_storage then
-		global_storages[player_name] = local_storage
-	else
-		return false
-	end
+  if local_storage then
+    global_storages[player_name] = local_storage
+  else
+    return false
+  end
     
     self_storage:write('return '..make_table(local_storage,0)..'\n')
     
@@ -630,11 +630,11 @@ fields = {
 -- Sets up tables and files for use in the current zone
 --------------------------------------------------
 priceLog.setup_zone = function(zone)
-	local current_zone = res.zones[zone].en
+  local current_zone = res.zones[zone].en
   my_zone = current_zone
-	findPrice.simple = file.new('data/'.. my_name ..'/simple/'.. current_zone ..'.log', true)
-	findPrice.raw = file.new('data/'.. my_name ..'/raw/'.. current_zone ..'.log', true)
-	priceLog.write_full_table()
+  findPrice.simple = file.new('data/'.. my_name ..'/simple/'.. current_zone ..'.log', true)
+  findPrice.raw = file.new('data/'.. my_name ..'/raw/'.. current_zone ..'.log', true)
+  priceLog.write_full_table()
   priceLog.notified = {}
 end
 
@@ -698,7 +698,7 @@ end
 --------------------------------------------------
 priceLog.add_to_database = function(id, name, price)
   local item = prices[id]
-  if (not item) or (item.char ~= my_name) then
+  if (not item) or (item.npc ~= 'Challoux') then
     prices[id] = {
       ['id'] = id,
       ['name'] = name,
@@ -722,7 +722,7 @@ priceLog.format_table_entry = function(item_id, item_name, price, char, zone, np
   if not char then char = '' end
   if not zone then zone = '' end
   if not npc then npc = '' end
-	return string.format(
+  return string.format(
     "    [%s] = {%s %s %s %s %s %s},\n",
     lib.padLeft(tostring(item_id), 5),
     padField('id', item_id),
@@ -746,25 +746,25 @@ end
 -- Checks the current inventory for any unseen items
 --------------------------------------------------
 priceLog.check_for_unseen = function()
-	local unseen_list = ''
-	local inventory = windower.ffxi.get_items(0)
-	for _, inv_item in ipairs(inventory) do
-		local id = inv_item['id']
-		if id and id > 0 then
-			local item = res.items[id]
+  local unseen_list = ''
+  local inventory = windower.ffxi.get_items(0)
+  for _, inv_item in ipairs(inventory) do
+    local id = inv_item['id']
+    if id and id > 0 then
+      local item = res.items[id]
       local db_entry = prices[id]
-			if (not item.flags['No NPC Sale']) and ((not db_entry) or (db_entry.npc ~= "Challoux")) then
+      if (not item.flags['No NPC Sale']) and ((not db_entry) or (db_entry.npc ~= "Challoux")) then
         if not priceLog.notified[id] then
           unseen_list = unseen_list .. item['en'] .. ", "
           priceLog.notified[id] = true
         end
-			end
-		end
-	end
-	if unseen_list ~= '' then
-		windower.add_to_chat(7, "[FindPrice] Unseen: " .. unseen_list)
-	end
-	checked_unseen = true
+      end
+    end
+  end
+  if unseen_list ~= '' then
+    windower.add_to_chat(7, "[FindPrice] Unseen: " .. unseen_list)
+  end
+  checked_unseen = true
 end
 
 -- Checks incoming chunks for price response and log them
@@ -819,29 +819,29 @@ end
 windower.register_event('load', update:cond(function() return windower.ffxi.get_info().logged_in end))
 
 windower.register_event('incoming chunk', function(id,original,modified,injected,blocked)
-    local seq = original:unpack('H',3)
-	if (next_sequence and seq == next_sequence) and zone_search then
-		update()
-        next_sequence = nil
-	end
+  local seq = original:unpack('H',3)
+  if (next_sequence and seq == next_sequence) and zone_search then
+    update()
+    next_sequence = nil
+  end
 
-	if id == 0x00B then -- Last packet of an old zone
-        zone_search = false
-    elseif id == 0x00A then -- First packet of a new zone, redundant because someone could theoretically load findPrice between the two
-		zone_search = false
-	elseif id == 0x01D and not zone_search then
-	-- This packet indicates that the temporary item structure should be copied over to
-	-- the real item structure, accessed with get_items(). Thus we wait one packet and
-	-- then trigger an update.
-        zone_search = true
-		next_sequence = (seq+22)%0x10000 -- 128 packets is about 1 minute. 22 packets is about 10 seconds.
-    elseif (id == 0x1E or id == 0x1F or id == 0x20) and zone_search then
+  if id == 0x00B then -- Last packet of an old zone
+    zone_search = false
+  elseif id == 0x00A then -- First packet of a new zone, redundant because someone could theoretically load findPrice between the two
+    zone_search = false
+  elseif id == 0x01D and not zone_search then
+  -- This packet indicates that the temporary item structure should be copied over to
+  -- the real item structure, accessed with get_items(). Thus we wait one packet and
+  -- then trigger an update.
+    zone_search = true
+    next_sequence = (seq+22)%0x10000 -- 128 packets is about 1 minute. 22 packets is about 10 seconds.
+  elseif (id == 0x1E or id == 0x1F or id == 0x20) and zone_search then
     -- Inventory Finished packets aren't sent for trades and such, so this is more
     -- of a catch-all approach. There is a subtantial delay to avoid spam writing.
     -- The idea is that if you're getting a stream of incoming item packets (like you're gear swapping in an intense fight),
     -- then it will keep putting off triggering the update until you're not.
-        next_sequence = (seq+22)%0x10000
-	end
+    next_sequence = (seq+22)%0x10000
+  end
   
 
   -- FINDPRICE SPECIFIC START
