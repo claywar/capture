@@ -5,8 +5,8 @@ hptrack.info = {
   name = 'HPTrack',
   log_name = 'HPT',
   box_name = 'HPT',
-  version = '000',
-  date = '2019/11/16',
+  version = '001',
+  date = '2020/05/25',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'hptrack','hpt'},
@@ -83,8 +83,7 @@ hptrack.parseAction = function(action)
       result[mob_id] = {
         dmg = 0
       }
-      for i, effect in ipairs(target.actions) do
-        local effect = target.actions[i]
+      for i, effect in pairs(target.actions) do
         local msg = hptrack.msg_types[action.category][effect.message]
         if msg and effect.param then
           result[mob_id].msg_type = msg[1]
@@ -416,6 +415,8 @@ hptrack.initialize = function()
       --[225] = {'WS (MP Drain)', 1},
       --[226] = {'WS (TP Drain)', 1},
       [238] = {'WS (Recover)', -1},
+      [263] = {'AOE (Recovery)', -1},
+      [264] = {'AOE Damage', 1},
       [317] = {'JA Hit', 1},
       [318] = {'JA (Recover)', -1},
       [323] = {'JA (No Effect)', 0},
@@ -429,10 +430,17 @@ hptrack.initialize = function()
       [227] = {'Magic (Drain)', 1},
       [252] = {'Magic (Burst)', 1},
       [262] = {'Magic (Burst)', 1},
+      [263] = {'AOE (Recovery)', -1},
+      [264] = {'AOE Damage', 1},
       [274] = {'Magic (Burst Drain)', 1},
       [648] = {'Meteor', 1},
       [650] = {'Meteor (Burst)', 1},
       [651] = {'Meteor (Recover)', -1},
+    },
+    [6] = {
+      [110] = {'Ability Dmg', 1},
+      [263] = {'AOE (Recovery)', -1},
+      [264] = {'AOE Damage', 1},
     }
   }
   
