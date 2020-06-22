@@ -5,8 +5,8 @@ hptrack.info = {
   name = 'HPTrack',
   log_name = 'HPT',
   box_name = 'HPT',
-  version = '001',
-  date = '2020/05/25',
+  version = '002',
+  date = '2020/06/22',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'hptrack','hpt'},
@@ -38,6 +38,36 @@ hptrack.defaults.color.system    = 19
 hptrack.settings = {}
 
 ---------------------------------------------------------------------------------
+-- COMMANDS
+---------------------------------------------------------------------------------
+hptrack.help_text = {
+  ['mode']            = "Sets mode: OFF | INFO | PASSIVE | ACTIVE",
+  ['ver']             = "Shows addon (and library) version and date",
+}
+
+hptrack.commands = {
+  ['help'] = function()
+    lib.displayHelp(hptrack)
+  end,
+  ['mode'] = function(args)
+    lib.setMode(hptrack, args[1])
+  end,  
+  ['ver'] = function()
+    lib.displayVer(hptrack)
+  end,
+}
+
+---------------------------------------------------------------------------------
+-- METHODS
+---------------------------------------------------------------------------------
+
+-- Checks for a valid command and executes it
+--------------------------------------------------
+hptrack.command = function(cmd, ...)
+  lib.command(hptrack, cmd, ...)
+end
+
+---------------------------------------------------------------------------------
 -- METHODS
 ---------------------------------------------------------------------------------
 
@@ -56,7 +86,7 @@ hptrack.processDeath = function(mob_id)
   
   local log_string = "[HP Track] Killed " .. mob.id .. " (".. mob.name .."): "
   log_string = log_string .. mob.min_hp .. "~" .. mob.max_hp .. "HP"
-  if estimated_hp then
+  if estimated_hp and (estimated_hp >= mob.min_hp and estimated_hp <= mob.max_hp) then
     log_string = log_string .. ", Est.HP: ".. estimated_hp .. " (Mthd: ".. mob.method.. ")"
   end
   
@@ -471,6 +501,10 @@ hptrack.initialize = function()
   hptrack.file.simple = lib.fileOpen(hptrack.settings.file_path.. hptrack.vars.my_name ..'/logs/simple.log')
 
   lib.checkLibVer(hptrack)
+  
+  ---------------------------------------------------------------------------------
+  -- EVENTS
+  ---------------------------------------------------------------------------------
   windower.register_event("action", function(action)
     local result = hptrack.parseAction(action)
   end)
@@ -478,6 +512,11 @@ hptrack.initialize = function()
   windower.register_event('zone change', function(new, old)
     hptrack.setupZone(new, old)
   end)
+  
+  if not capture then
+    windower.register_event('addon command', hptrack.command)
+  end
+  
   windower.register_event('incoming chunk', hptrack.checkChunk)
   hptrack.setupZone(windower.ffxi.get_info().zone)
 end
