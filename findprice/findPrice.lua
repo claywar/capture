@@ -67,6 +67,13 @@ end
 prices = resale_database or {}
 
 price_search = false
+
+acceptable_npcs =
+{
+  ['Challoux'] = true,
+  ['Caiphimonride'] = true,
+  ['Curio Vendor Moogle'] = true,
+}
 -- FINDPRICE SPECIFIC END
 
 
@@ -385,11 +392,11 @@ function search(query, export)
                             local found_price = prices[tonumber(id)]
                             local findprice_item = res.items[tonumber(id)]
                             local can_sell = not findprice_item.flags['No NPC Sale']
-                            local not_challoux = true
-                            if found_price and found_price.npc == 'Challoux' then
-                              not_challoux = false
+                            local not_acceptable = true
+                            if found_price and acceptable_npcs[found_price.npc] then
+                              not_acceptable = false
                             end
-                            if can_sell and not_challoux then
+                            if can_sell and not_acceptable then
                               new_price_item = true
                             else
                               new_price_item = false
@@ -656,7 +663,7 @@ end
 priceLog.shouldUpdate = function(memory_price_info, file_price_info)
   if not file_price_info then
     return true
-  elseif (memory_price_info.npc == 'Challoux') and (file_price_info.npc ~= 'Challoux') then
+  elseif acceptable_npcs[memory_price_info.npc] and (not acceptable_npcs[file_price_info.npc]) then
     return true
   end
   return false
@@ -698,7 +705,7 @@ end
 --------------------------------------------------
 priceLog.add_to_database = function(id, name, price)
   local item = prices[id]
-  if (not item) or (item.npc ~= 'Challoux') then
+  if (not item) or (not acceptable_npcs[item.npc]) then
     prices[id] = {
       ['id'] = id,
       ['name'] = name,
@@ -753,7 +760,7 @@ priceLog.check_for_unseen = function()
     if id and id > 0 then
       local item = res.items[id]
       local db_entry = prices[id]
-      if (not item.flags['No NPC Sale']) and ((not db_entry) or (db_entry.npc ~= "Challoux")) then
+      if (not item.flags['No NPC Sale']) and ((not db_entry) or (not acceptable_npcs[db_entry.npc])) then
         if not priceLog.notified[id] then
           unseen_list = unseen_list .. item['en'] .. ", "
           priceLog.notified[id] = true
