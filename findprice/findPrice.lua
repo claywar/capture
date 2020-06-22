@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _addon.name    = 'findPrice'
 _addon.author  = 'Zohno (findAll), ibm2431 (price mod)'
-_addon.version = '1.20200524'
+_addon.version = '1.20200622'
 _addon.commands = {'findall'}
 
 require('chat')
