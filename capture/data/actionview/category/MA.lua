@@ -186,6 +186,7 @@ local database =
       [ 206] = {['name']="Freeze",                         ['category']=4, ['id']=206,  ['animation']=206,  ['message']=2,   },
       [ 207] = {['name']="Freeze II",                      ['category']=4, ['id']=207,  ['animation']=207,  ['message']=2,   },
       [ 208] = {['name']="Tornado",                        ['category']=4, ['id']=208,  ['animation']=208,  ['message']=2,   },
+      [ 209] = {['name']="Tornado II",                     ['category']=4, ['id']=209,  ['animation']=209,  ['message']=2,   },
       [ 210] = {['name']="Quake",                          ['category']=4, ['id']=210,  ['animation']=210,  ['message']=2,   },
       [ 211] = {['name']="Quake II",                       ['category']=4, ['id']=211,  ['animation']=211,  ['message']=2,   },
       [ 212] = {['name']="Burst",                          ['category']=4, ['id']=212,  ['animation']=212,  ['message']=2,   },
