@@ -5,8 +5,8 @@ hptrack.info = {
   name = 'HPTrack',
   log_name = 'HPT',
   box_name = 'HPT',
-  version = '002',
-  date = '2020/06/22',
+  version = '003',
+  date = '2020/12/27',
   lib_version = '006',
   author = 'ibm2431',
   commands = {'hptrack','hpt'},
@@ -81,7 +81,7 @@ hptrack.processDeath = function(mob_id)
   local estimated_hp = hptrack.calculateIntervals(mob)
   if ((not estimated_hp) or (estimated_hp < mob.min_hp) or (estimated_hp > mob.max_hp)) and (mob.min_hp > 1) then
     mob.method = 'L'
-    estimated_hp = math.floor(mob.total_damage * ((mob.starting_hpp - mob.hpp) / 100))
+    estimated_hp = math.floor(((mob.min_hp - 1) / (mob.starting_hpp - mob.hpp)) * 100)
   end
   
   local log_string = "[HP Track] Killed " .. mob.id .. " (".. mob.name .."): "
