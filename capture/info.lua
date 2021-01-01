@@ -38,7 +38,7 @@ info.defaults.show_target = true -- shows the target info box
 info.defaults.show_world  = true -- shows the world info box
 info.defaults.show_job    = true -- shows current job information
 info.defaults.show_zone   = true -- shows current zone information
-info.defaults.show_moon   = true -- shows moon information
+info.defaults.show_moon   = false -- shows moon information
 
 info.defaults.char_box = T{}
 info.defaults.char_box.pos   = T{}
