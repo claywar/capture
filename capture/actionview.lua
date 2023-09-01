@@ -1,133 +1,153 @@
+-----------------------------------
+-- ActionView
+-----------------------------------
 require('capture-lib')
-
+-----------------------------------
 actionview = actionview or {}
-actionview.info = {
-    name = 'ActionView',
-    log_name = 'AView',
-    box_name = 'AV',
-    version = '007',
-    date = '2020/05/18',
+
+actionview.info =
+{
+    name        = 'ActionView',
+    log_name    = 'AView',
+    box_name    = 'AV',
+    version     = '007',
+    date        = '2023/08/31',
     lib_version = '006',
-    author = 'ibm2431',
-    commands = { 'actionview', 'actview', 'aview' },
-    key = 'actionview',
-    folder = 'actionview/',
+    author      = 'ibm2431',
+    commands    = { 'actionview', 'actview', 'aview' },
+    key         = 'actionview',
+    folder      = 'actionview/',
 }
 
 if not capture then
-    _addon.name = actionview.info.name
-    _addon.version = actionview.info.version
-    _addon.date = actionview.info.date
+    _addon.name        = actionview.info.name
+    _addon.version     = actionview.info.version
+    _addon.date        = actionview.info.date
     _addon.lib_version = actionview.info.lib_version
-    _addon.author = actionview.info.author
-    _addon.commands = actionview.info.commands
+    _addon.author      = actionview.info.author
+    _addon.commands    = actionview.info.commands
 end
 
 -----------------------------------
--- DEFAULT USER SETTINGS
+-- Default User Settings
 -----------------------------------
+actionview.defaults = T{
+    mode      = lib.mode.ACTIVE,
+    file_path = 'data/actionview/',
 
-actionview.defaults = T {}
+    show_box       = true, -- Displays the ActionView Info Box
+    auto_hide      = true, -- Hide the ActionView Info Box after auto_hide_time period
+    auto_hide_time = 4,    -- Number of seconds to display the Info Box if auto_hide is enabled
+    mobs_only      = true,
 
-actionview.defaults.mode = lib.mode.ACTIVE
-actionview.defaults.file_path = 'data/actionview/'
+    -- Determine which Action Categories to Display
+    category = T{
+        [ 1] = false,
+        [ 2] = false,
+        [ 3] = true,
+        [ 4] = true,
+        [ 5] = false,
+        [ 6] = true,
+        [ 7] = false,
+        [ 8] = false,
+        [ 9] = false,
+        [10] = false,
+        [11] = true,
+        [12] = false,
+        [13] = true,
+        [14] = true,
+        [15] = true,
+    },
 
-actionview.defaults.show_box = true -- shows the actionview info box
-actionview.defaults.auto_hide = true -- when an event finishes, auto-hide the box after 5 seconds
-actionview.defaults.auto_hide_time = 4 -- the number of seconds before hiding the box after event
-actionview.defaults.mobs_only = true
+    box = T{
+        max_num = 3,
+        spacing = 8,
 
-actionview.defaults.category = T {}
-actionview.defaults.category[1] = false
-actionview.defaults.category[2] = false
-actionview.defaults.category[3] = true
-actionview.defaults.category[4] = true
-actionview.defaults.category[5] = false
-actionview.defaults.category[6] = true
-actionview.defaults.category[7] = false
-actionview.defaults.category[8] = false
-actionview.defaults.category[9] = false
-actionview.defaults.category[10] = false
-actionview.defaults.category[11] = true
-actionview.defaults.category[12] = false
-actionview.defaults.category[13] = true
-actionview.defaults.category[14] = true
-actionview.defaults.category[15] = true
+        pos = T{
+            x = 465,
+            y = 540,
+        },
 
-actionview.defaults.box = T {}
-actionview.defaults.box.max_num = 3
-actionview.defaults.box.spacing = 8
+        text = T{
+            size  = 11,
+            font  = 'Consolas',
+            alpha = 255,
+            red   = 255,
+            green = 255,
+            blue  = 255,
+        },
 
-actionview.defaults.box.pos = T {}
-actionview.defaults.box.pos.x = 465
-actionview.defaults.box.pos.y = 540
+        bg = T{
+            red   = 30,
+            green = 30,
+            blue  = 60,
+            alpha = 230,
+        },
+    },
 
-actionview.defaults.box.text = {}
-actionview.defaults.box.text.size = 11
-actionview.defaults.box.text.font = 'Consolas'
-actionview.defaults.box.text.alpha = 255
-actionview.defaults.box.text.red = 255
-actionview.defaults.box.text.green = 255
-actionview.defaults.box.text.blue = 255
-
-actionview.defaults.box.bg = T {}
-actionview.defaults.box.bg.red = 30
-actionview.defaults.box.bg.green = 30
-actionview.defaults.box.bg.blue = 60
-actionview.defaults.box.bg.alpha = 230
-
-actionview.defaults.color = T {}
-actionview.defaults.color.name = 24 -- Red Lotus Blade
-actionview.defaults.color.id = 22 -- 34
-actionview.defaults.color.actor = 12 -- 01234567 (Name)
-actionview.defaults.color.animation = 20 -- 3
-actionview.defaults.color.category = 11 -- 3
-actionview.defaults.color.message = 25 -- 185
-actionview.defaults.color.system = 19
-
------------------------------------
--- COMMANDS
------------------------------------
-actionview.help_text = {
-    ['capture'] = 'Starts or stops a capture: start | stop',
-    ['box_test'] = 'Displays a test box. Call again to hide, and save setting.',
-    ['color_test'] = 'Displays the color codes used by the addon',
-    ['mobs_only'] = 'Limits action display to mobs: OFF | ON',
-    ['mode'] = 'Sets mode: OFF | INFO | PASSIVE | ACTIVE',
-    ['save'] = 'Immediately save pending database information',
-    ['ver'] = 'Shows addon (and library) version and date',
+    color = T{
+        name      = 24, -- Red Lotus Blade
+        id        = 22, -- 34
+        actor     = 12, -- 01234567 (Name)
+        animation = 20, -- 3
+        category  = 11, -- 3
+        message   = 25, -- 185
+        system    = 19,
+    },
 }
 
-actionview.commands = {
-    ['capture'] = function(args)
-        lib.capture(actionview, args)
-    end,
-    ['color_test'] = function()
-        lib.colorTest(actionview)
-    end,
+-----------------------------------
+-- Commands
+-----------------------------------
+actionview.help_text =
+{
+    ['capture']    = 'Starts or stops a capture: start | stop',
+    ['box_test']   = 'Displays a test box. Call again to hide, and save setting.',
+    ['color_test'] = 'Displays the color codes used by the addon',
+    ['mobs_only']  = 'Limits action display to mobs: OFF | ON',
+    ['mode']       = 'Sets mode: OFF | INFO | PASSIVE | ACTIVE',
+    ['save']       = 'Immediately save pending database information',
+    ['ver']        = 'Shows addon (and library) version and date',
+}
+
+actionview.commands =
+{
     ['box_test'] = function()
         lib.testBox(actionview)
     end,
-    ['ver'] = function()
-        lib.displayVer(actionview)
+
+    ['capture'] = function(args)
+        lib.capture(actionview, args)
     end,
-    ['mobs_only'] = function(args)
-        lib.setToggle(actionview, 'mobs_only', args[1])
+
+    ['color_test'] = function()
+        lib.colorTest(actionview)
     end,
-    ['mode'] = function(args)
-        lib.setMode(actionview, args[1])
-    end,
+
     ['help'] = function()
         lib.displayHelp(actionview)
     end,
+
+    ['mobs_only'] = function(args)
+        lib.setToggle(actionview, 'mobs_only', args[1])
+    end,
+
+    ['mode'] = function(args)
+        lib.setMode(actionview, args[1])
+    end,
+
     ['save'] = function()
         actionview.writeDatabases(actionview.vars.current_zone)
         coroutine.close(actionview.vars.scheduled_write_coroutine)
     end,
+
+    ['ver'] = function()
+        lib.displayVer(actionview)
+    end,
 }
 
 -----------------------------------
--- METHODS
+-- Methods
 -----------------------------------
 
 -- Checks for a valid command and executes it
@@ -140,11 +160,10 @@ actionview.writeBox = function(info)
     box = texts.new(actionview.template.all, actionview.settings.box)
     texts.pos(box, actionview.vars.box_positions[1].x, actionview.vars.box_positions[1].y)
 
-    box.actor = actionview.color.box.ACTOR .. info.actor
-    box.name = actionview.color.box.NAME .. lib.padRight(info.name, 35)
-    box.category = actionview.color.box.CATEGORY ..
-                       lib.padRight(actionview.template.category[info.category], 5)
-    box.id = actionview.color.box.ID .. lib.padLeft(info.id, 5)
+    box.actor    = actionview.color.box.ACTOR .. info.actor
+    box.name     = actionview.color.box.NAME .. lib.padRight(info.name, 35)
+    box.category = actionview.color.box.CATEGORY .. lib.padRight(actionview.template.category[info.category], 5)
+    box.id       = actionview.color.box.ID .. lib.padLeft(info.id, 5)
 
     if info.animation then
         box.animation = actionview.color.box.ANIMATION .. lib.padLeft(info.animation, 4)
@@ -177,15 +196,23 @@ end
 
 -- Checks if a mob ID belongs to a "mob" based on the current zone
 actionview.isMob = function(id)
-    return (id >= actionview.vars.zone_start) and (id <= actionview.vars.zone_end)
+    return id >= actionview.vars.zone_start and
+        id <= actionview.vars.zone_end
 end
 
 -- Handles displaying information for an action
 actionview.checkAction = function(action)
     if actionview.settings.mode > lib.mode.OFF and actionview.settings.category[action.category] then
-        if (not actionview.settings.mobs_only) or actionview.isMob(action.actor_id) then
+        if
+            not actionview.settings.mobs_only or
+            actionview.isMob(action.actor_id)
+        then
             local result, str_info = actionview.parseAction(action)
-            if result and (result.message ~= 84) then
+
+            if
+                result and
+                result.message ~= 84
+            then
                 if actionview.settings.mode ~= lib.mode.PASSIVE then
                     lib.updateBox(actionview, str_info)
                     lib.msg(actionview, actionview.buildChatlogString(str_info))
@@ -207,11 +234,14 @@ actionview.parseAction = function(action)
         [1] = function(action)
             return 'Melee Attack'
         end, -- Melee Attack
+
         [2] = function(action)
             return 'Ranged Attack'
         end, -- Ranged Attack execution
+
         [3] = function(action) -- WS or some damaging JAs
             local message = action.targets[1].actions[1].message
+
             if action.param >= 257 then
                 return res.monster_abilities[action.param].en
             elseif message == 317 or message == 324 then
@@ -220,17 +250,21 @@ actionview.parseAction = function(action)
                 return res.weapon_skills[action.param].en
             end
         end,
+
         [4] = function(action) -- Casted magic
             local spell = res.spells[action.param]
+
             if spell then
                 return spell.en
             else
                 return ''
             end
         end,
+
         [5] = function(action)
             return res.items[action.param].en
         end, -- Item Usage execution
+
         [6] = function(action) -- Most job abilities; can include monster abilities
             if actionview.isMob(action.actor_id) then
                 return res.monster_abilities[action.param].en
@@ -238,44 +272,58 @@ actionview.parseAction = function(action)
                 return res.job_abilities[action.param].en
             end
         end,
+
         [7] = function(action)
             return res.weapon_skills[action.targets[1].actions[1].param].en
         end, -- TP Move Start "Players: add 768, compare abils.xml. Mobs: -256, mabils.xml"
+
         [8] = function(action)
             return res.spells[action.targets[1].actions[1].param].en
         end, -- Spell Start
+
         [9] = function(action)
             return res.items[action.targets[1].actions[1].param].en
         end, -- Item Usage initiation
+
         [11] = function(action) -- Mob TP moves
             local ability = res.monster_abilities[action.param]
+
             if ability then
                 return ability.en
             else
                 return ''
             end
         end,
+
         [12] = function(action)
             return 'Ranged Attack (Start)'
         end, -- Ranged Attack initiation
+
         [13] = function(action)
             return res.job_abilities[action.param].en
         end, -- Pet TP Moves
+
         [14] = function(action)
             return res.job_abilities[action.param].en
         end, -- Non-blinkable job abilities (Jigs, Sambas, Steps, Waltzes, Flourish)
+
         [15] = function(action)
             return res.job_abilities[action.param].en
         end, -- Some RUN job abilities
     }
-    result.category = action.category
-    result.actor = action.actor_id
 
-    result.id = action.param
+    result.category = action.category
+    result.actor    = action.actor_id
+    result.id       = action.param
+
     if action.targets and action.targets[1] then
-        if action.targets[1].actions and action.targets[1].actions[1] then
-            result.message = action.targets[1].actions[1].message
+        if
+            action.targets[1].actions and
+            action.targets[1].actions[1]
+        then
+            result.message   = action.targets[1].actions[1].message
             result.animation = action.targets[1].actions[1].animation
+
             if action.category == 8 then
                 result.id = action.targets[1].actions[1].param
             end
@@ -296,6 +344,7 @@ actionview.parseAction = function(action)
     else
         result.name = 'Unknown Ability'
     end
+
     str_info.name = result.name
 
     result.actor_name = ''
@@ -303,6 +352,7 @@ actionview.parseAction = function(action)
     if mob and mob.name then
         result.actor_name = mob.name
     end
+
     str_info.actor_name = result.actor_name
 
     return result, str_info
@@ -313,12 +363,21 @@ actionview.addActionToCategory = function(db, result)
     local category_db = db.category[result.category]
 
     if not category_db then
-        db.category[result.category] = { info = {},
-                                         _meta = { key = result.category, num = 0, loaded_num = 0 } }
+        db.category[result.category] =
+        {
+            info = {},
+            _meta =
+            {
+                key        = result.category,
+                num        = 0,
+                loaded_num = 0
+            }
+        }
+
         category_db = db.category[result.category]
     end
     if not category_db.info[result.id] then
-        category_db._meta.num = category_db._meta.num + 1
+        category_db._meta.num       = category_db._meta.num + 1
         category_db.info[result.id] = { info = result }
         return true
     end
@@ -331,9 +390,16 @@ actionview.addActionToMobList = function(db, result)
     local zone_db = db.zone[actionview.vars.current_zone]
 
     if not zone_db then
-        db.zone[actionview.vars.current_zone] = {
+        db.zone[actionview.vars.current_zone] =
+        {
             info = {},
-            _meta = { key = actionview.vars.current_zone, num = 0, loaded_num = 0, parent = true },
+            _meta =
+            {
+                key        = actionview.vars.current_zone,
+                num        = 0,
+                loaded_num = 0,
+                parent     = true
+            },
         }
         zone_db = db.zone[actionview.vars.current_zone]
     end
@@ -341,7 +407,17 @@ actionview.addActionToMobList = function(db, result)
     local mob_key = result.actor_name .. '-' .. tostring(result.actor)
     local mob_db = zone_db.info[mob_key]
     if not mob_db then
-        zone_db.info[mob_key] = { info = {}, _meta = { key = mob_key, parent = true, num = 0 } }
+        zone_db.info[mob_key] =
+        {
+            info = {},
+            _meta =
+            {
+                key = mob_key,
+                parent = true,
+                num = 0
+            }
+        }
+
         mob_db = zone_db.info[mob_key]
     end
 
@@ -365,7 +441,7 @@ end
 
 -- Logs the result of a parsed action into various internal tables and files
 actionview.recordAction = function(result, str_info)
-    local new_ability = actionview.addActionToCategory(actionview.db.data, result)
+    local new_ability     = actionview.addActionToCategory(actionview.db.data, result)
     local new_mob_ability = actionview.addActionToMobList(actionview.db.data, result)
 
     local simple_string = actionview.buildSimpleString(str_info)
@@ -417,8 +493,7 @@ actionview.writeDatabases = function(zone_left)
             local capture_zone_path = actionview.vars.capture_root .. 'zone/' .. zone_left_name .. '.lua'
             actionview.file.capture.old_zone = files.new(capture_zone_path, true)
 
-            if actionview.db.data.capture.zone[zone_left]._meta.num >
-                actionview.db.data.capture.zone[zone_left]._meta.loaded_num then
+            if actionview.db.data.capture.zone[zone_left]._meta.num > actionview.db.data.capture.zone[zone_left]._meta.loaded_num then
                 had_new = true
                 actionview.db.data.capture.zone[zone_left]._meta.parent = true
                 lib.writeDatabase(actionview, actionview.db.data.capture.zone, zone_left,
@@ -462,8 +537,9 @@ end
 
 -- Prepares master databases for all action categories
 actionview.prepareCategoryDatabases = function()
-    actionview.file.category = {}
+    actionview.file.category         = {}
     actionview.file.capture.category = {}
+
     for i = 1, 15 do
         local path = actionview.settings.file_path .. 'category/' .. actionview.template.category[tostring(i)]
         actionview.file.category[i] = files.new(path .. '.lua', true)
@@ -472,20 +548,34 @@ actionview.prepareCategoryDatabases = function()
             actionview.db.data.category[i] = lib.loadDatabase(path).info[i]
             actionview.db.data.category[i]._meta.loaded_num = actionview.db.data.category[i]._meta.num
         else
-            actionview.db.data.category[i] = {
-                info = {},
-                _meta = { key = i, num = 0, loaded_num = 0, parent = true },
+            actionview.db.data.category[i] =
+            {
+                info  = {},
+                _meta =
+                {
+                    key        = i,
+                    num        = 0,
+                    loaded_num = 0,
+                    parent     = true
+                },
             }
         end
 
         -- Prepare category databases for a capture
         if actionview.settings.mode == lib.mode.CAPTURE then
-            local capture_path = actionview.vars.capture_root .. 'category/' ..
-                                     actionview.template.category[tostring(i)]
+            local capture_path = actionview.vars.capture_root .. 'category/' .. actionview.template.category[tostring(i)]
+
             actionview.file.capture.category[i] = files.new(capture_path .. '.lua', true)
-            actionview.db.data.capture.category[i] = {
-                info = {},
-                _meta = { key = i, num = 0, loaded_num = 0, parent = true },
+            actionview.db.data.capture.category[i] =
+            {
+                info  = {},
+                _meta =
+                {
+                    key        = i,
+                    num        = 0,
+                    loaded_num = 0,
+                    parent     = true,
+                },
             }
         end
     end
@@ -515,7 +605,22 @@ end
 
 -- Starts a capture
 actionview.startCapture = function(file_root)
-    actionview.db.data.capture = { category = { _meta = {} }, zone = { _meta = { num = 0, loaded_num = 0 } } }
+    actionview.db.data.capture =
+    {
+        category =
+        {
+            _meta = {}
+        },
+
+        zone =
+        {
+            _meta =
+            {
+                num        = 0,
+                loaded_num = 0,
+            }
+        }
+    }
 
     actionview.db.data.capture.zone._meta.format = actionview.db.format.ABILITY
     actionview.db.data.capture.category._meta.format = actionview.db.format.ABILITY
@@ -550,59 +655,64 @@ actionview.setupZone = function(zone)
 end
 
 -----------------------------------
--- INITIALIZE
+-- Initialize
 -----------------------------------
 actionview.initialize = function()
-    -- DISPLAY COLORS AND LOG HEADERS
-
+    -- Display Colors and Log Headers
     actionview.color = {}
-    actionview.color.log = {
+    actionview.color.log =
+    {
         -- Preformatted character codes for log colors.
-        ID = lib.color[actionview.settings.color.id][1],
-        NAME = lib.color[actionview.settings.color.name][1],
-        ACTOR = lib.color[actionview.settings.color.actor][1],
+        ID        = lib.color[actionview.settings.color.id][1],
+        NAME      = lib.color[actionview.settings.color.name][1],
+        ACTOR     = lib.color[actionview.settings.color.actor][1],
         ANIMATION = lib.color[actionview.settings.color.animation][1],
-        CATEGORY = lib.color[actionview.settings.color.category][1],
-        MESSAGE = lib.color[actionview.settings.color.message][1],
-        SYSTEM = lib.color[actionview.settings.color.system][1],
-    }
-    actionview.color.box = {
-        -- \\cs(#,#,#) values for Windower text boxes
-        ID = lib.color[actionview.settings.color.id][2],
-        NAME = lib.color[actionview.settings.color.name][2],
-        ACTOR = lib.color[actionview.settings.color.actor][2],
-        ANIMATION = lib.color[actionview.settings.color.animation][2],
-        CATEGORY = lib.color[actionview.settings.color.category][2],
-        MESSAGE = lib.color[actionview.settings.color.message][2],
-        SYSTEM = lib.color[actionview.settings.color.system][2],
+        CATEGORY  = lib.color[actionview.settings.color.category][1],
+        MESSAGE   = lib.color[actionview.settings.color.message][1],
+        SYSTEM    = lib.color[actionview.settings.color.system][1],
     }
 
-    actionview.h = {
+    actionview.color.box =
+    {
+        -- \\cs(#,#,#) values for Windower text boxes
+        ID        = lib.color[actionview.settings.color.id][2],
+        NAME      = lib.color[actionview.settings.color.name][2],
+        ACTOR     = lib.color[actionview.settings.color.actor][2],
+        ANIMATION = lib.color[actionview.settings.color.animation][2],
+        CATEGORY  = lib.color[actionview.settings.color.category][2],
+        MESSAGE   = lib.color[actionview.settings.color.message][2],
+        SYSTEM    = lib.color[actionview.settings.color.system][2],
+    }
+
+    actionview.h =
+    {
         -- Headers for log string. ex: NPC:
-        id = actionview.color.log.SYSTEM .. 'ID: ' .. actionview.color.log.ID,
-        name = actionview.color.log.NAME .. '%s' .. actionview.color.log.SYSTEM .. ' > ',
+        id        = actionview.color.log.SYSTEM .. 'ID: ' .. actionview.color.log.ID,
+        name      = actionview.color.log.NAME .. '%s' .. actionview.color.log.SYSTEM .. ' > ',
         animation = actionview.color.log.SYSTEM .. 'Anim: ' .. actionview.color.log.ANIMATION,
-        category = actionview.color.log.SYSTEM .. 'Cat: ' .. actionview.color.log.CATEGORY,
-        message = actionview.color.log.SYSTEM .. 'Msg: ' .. actionview.color.log.MESSAGE,
+        category  = actionview.color.log.SYSTEM .. 'Cat: ' .. actionview.color.log.CATEGORY,
+        message   = actionview.color.log.SYSTEM .. 'Msg: ' .. actionview.color.log.MESSAGE,
     }
 
     -- VARIABLES AND TEMPLATES
 
-    actionview.template = {
+    actionview.template =
+    {
         all = ' ${name|%s} ' .. actionview.color.box.SYSTEM .. ' [AV]\n' .. actionview.color.box.SYSTEM ..
             ' Actor: ${actor|%s}\n' .. actionview.color.box.SYSTEM .. ' C: ${category|%s}' ..
             actionview.color.box.SYSTEM .. ' ID: ${id|%s}' .. actionview.color.box.SYSTEM ..
             '  Anim: ${animation|%s}' .. actionview.color.box.SYSTEM .. '  Msg: ${message|%s}',
-        category = {
-            ['1'] = 'Melee', -- Melee Attack
-            ['2'] = 'RA', -- Ranged Attack execution
-            ['3'] = 'WS-JA', -- WS or some damaging JAs; "ability IDs are unshifted, WS IDs shifted to +768"
-            ['4'] = 'MA', -- Casted magic
-            ['5'] = 'Item', -- Item Usage execution
-            ['6'] = 'JA', -- Most job abilities
-            ['7'] = 'TP-St', -- TP Move Start "Players: add 768, compare abils.xml. Mobs: -256, mabils.xml"
-            ['8'] = 'MA-St', -- Spell Start
-            ['9'] = 'Itm-S', -- Item Usage initiation
+        category =
+        {
+            ['1']  = 'Melee', -- Melee Attack
+            ['2']  = 'RA',    -- Ranged Attack execution
+            ['3']  = 'WS-JA', -- WS or some damaging JAs; "ability IDs are unshifted, WS IDs shifted to +768"
+            ['4']  = 'MA',    -- Casted magic
+            ['5']  = 'Item',  -- Item Usage execution
+            ['6']  = 'JA',    -- Most job abilities
+            ['7']  = 'TP-St', -- TP Move Start "Players: add 768, compare abils.xml. Mobs: -256, mabils.xml"
+            ['8']  = 'MA-St', -- Spell Start
+            ['9']  = 'Itm-S', -- Item Usage initiation
             ['10'] = 'Unkwn', -- Unknown category
             ['11'] = 'Mb-TP', -- Mob TP moves
             ['12'] = 'RA-St', -- Ranged Attack initiation
@@ -616,18 +726,27 @@ actionview.initialize = function()
     actionview.vars.my_name = windower.ffxi.get_player().name
 
     actionview.vars.show_box = actionview.settings.show_box
-    -- I really should not have to do this, but assigning box positions based off
-    -- of settings.box.pos.y directly will cause settings.box.pos.y to CHANGE
-    -- when I move a box that was previously assigned in that y position.
-    actionview.vars.initial_x = actionview.settings.box.pos.x
-    actionview.vars.initial_y = actionview.settings.box.pos.y
-    actionview.vars.in_event = false
-    actionview.vars.hide_ticking = false
+    -- Assigning box positions based off of settings.box.pos.y directly will cause settings.box.pos.y to change
+    -- when moving a box that was previously assigned in that y position.
+
+    actionview.vars.initial_x     = actionview.settings.box.pos.x
+    actionview.vars.initial_y     = actionview.settings.box.pos.y
+    actionview.vars.in_event      = false
+    actionview.vars.hide_ticking  = false
     actionview.vars.color_testing = false
 
-    actionview.vars.box_positions = { [1] = { x = actionview.vars.initial_x, y = actionview.vars.initial_y } }
+    actionview.vars.box_positions =
+    {
+        [1] =
+        {
+            x = actionview.vars.initial_x,
+            y = actionview.vars.initial_y,
+        }
+    }
+
     for i = 2, 10 do
-        actionview.vars.box_positions[i] = {
+        actionview.vars.box_positions[i] =
+        {
             x = actionview.vars.initial_x,
             y = actionview.vars.initial_y -
                 (((actionview.settings.box.text.size + actionview.settings.box.spacing) * 4) * (i - 1)),
@@ -636,32 +755,34 @@ actionview.initialize = function()
 
     actionview.vars.boxes = {}
     actionview.vars.test_box_info = {
-        category = '7',
-        id = '1234',
-        name = 'Moogle\'s Supernova Explosion',
-        actor = '12345678 (Test Moogle)',
+        category  = '7',
+        id        = '1234',
+        name      = 'Moogle\'s Supernova Explosion',
+        actor     = '12345678 (Test Moogle)',
         animation = '1234',
-        message = '123',
+        message   = '123',
     }
 
     actionview.db = {}
     actionview.db.data = { category = { _meta = {} }, zone = { _meta = {} } }
-    actionview.db.format = {
-        ['ABILITY'] = {
+    actionview.db.format =
+    {
+        ['ABILITY'] =
+        {
             _key = { field = 'id', type = '%d', width = 4 },
             _num = 5,
-            [1] = { ord = 1, field = 'name', type = '%s', width = 30 },
-            [2] = { ord = 2, field = 'category', type = '%d', width = 2 },
-            [3] = { ord = 3, field = 'id', type = '%d', width = 4 },
-            [4] = { ord = 4, field = 'animation', type = '%d', width = 4 },
-            [5] = { ord = 5, field = 'message', type = '%d', width = 3 },
+
+            [1] = { ord = 1, field = 'name',      type = '%s', width = 30 },
+            [2] = { ord = 2, field = 'category',  type = '%d', width = 2  },
+            [3] = { ord = 3, field = 'id',        type = '%d', width = 4  },
+            [4] = { ord = 4, field = 'animation', type = '%d', width = 4  },
+            [5] = { ord = 5, field = 'message',   type = '%d', width = 3  },
         },
     }
 
     actionview.file = T {}
     actionview.file.capture = T {}
-    actionview.file.simple = lib.fileOpen(actionview.settings.file_path .. actionview.vars.my_name ..
-                                              '/logs/simple.log')
+    actionview.file.simple = lib.fileOpen(actionview.settings.file_path .. actionview.vars.my_name .. '/logs/simple.log')
 
     lib.checkLibVer(actionview)
     lib.formatDatabaseStrings(actionview)
@@ -672,6 +793,7 @@ actionview.initialize = function()
     windower.register_event('zone change', function(new, old)
         actionview.setupZone(new)
     end)
+
     windower.register_event('action', actionview.checkAction)
     if not capture then
         windower.register_event('addon command', actionview.command)
